@@ -133,7 +133,7 @@ resource "aws_cognito_user_pool_client" "argocd" {
 # Cognito User Pool Group - ArgoCD Admins
 ################################################################################
 
-resource "aws_cognito_user_pool_group" "argocd_admins" {
+resource "aws_cognito_user_group" "argocd_admins" {
   name         = local.cognito.admin_group_name
   user_pool_id = aws_cognito_user_pool.main.id
   description  = local.cognito.admin_group_description
