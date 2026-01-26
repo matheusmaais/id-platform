@@ -196,6 +196,53 @@ Branch: platform-gitops-implementation
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-26: GitOps Apply ✅
+**Status:** ✅ DEPLOYED (kubectl wait needs local kubeconfig)
+
+**Apply Result:**
+- Terraform apply OK
+- ArgoCD, AWS LB Controller, External-DNS, Cognito created
+- App-of-apps (`platform-apps`) created
+
+**Outputs (key):**
+- ArgoCD: `https://argocd.timedevops.click`
+- Cognito Issuer: `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_hxay4Xx1g`
+
+**Post-apply issue:**
+- `kubectl wait` failed locally due to missing kubeconfig:
+  - `lookup ...eks.amazonaws.com: no such host`
+
+**Fix:**
+- `aws eks update-kubeconfig --region us-east-1 --name platform-eks --profile darede`
+- Then: `make validate-gitops`
+
+### 2026-01-26: GitOps Apply Fix (Cognito MFA) ✅
+**Status:** ✅ READY (apply retry required)
+
+**Issue:**
+- Cognito User Pool creation failed with `Invalid MFA configuration` when `mfa_configuration = OPTIONAL` without a configured MFA method.
+
+**Fix Applied:**
+- Enabled software token MFA configuration:
+  - `software_token_mfa_configuration { enabled = true }`
+
+**Next Command:**
+- `AWS_PROFILE=darede make apply-gitops`
+
+### 2026-01-23: GitOps Plan Fixes + Provider Upgrade ✅
+**Status:** ✅ PLAN OK (with `AWS_PROFILE=darede`)
+
+**What Changed:**
+- Upgraded Terraform providers via `terraform init -upgrade` (lockfile updated)
+- Helm provider v3 syntax fixed (`kubernetes = { ... }`)
+- IRSA assume-role now uses EKS data source OIDC issuer
+- ALB SG annotation uses EKS data source `vpc_config` SG ID
+- ACM lookup now matches primary domain `timedevops.click` (SAN includes wildcard)
+
+**Commands:**
+- Init/upgrade: `cd terraform/platform-gitops && terraform init -upgrade -reconfigure -backend-config="profile=darede"`
+- Plan: `AWS_PROFILE=darede terraform plan`
+
 ### 2026-01-24: Phase 0 GitOps Implementation ✅
 **Status:** ✅ CODE COMPLETE (awaiting deployment)
 

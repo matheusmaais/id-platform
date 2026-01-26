@@ -33,7 +33,7 @@ data "aws_route53_zone" "main" {
 ################################################################################
 
 data "aws_acm_certificate" "wildcard" {
-  domain      = "*.${local.domain}"
+  domain      = local.domain
   statuses    = ["ISSUED"]
   most_recent = true
 }

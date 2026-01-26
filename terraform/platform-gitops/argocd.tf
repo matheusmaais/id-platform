@@ -133,7 +133,7 @@ resource "helm_release" "argocd" {
             "external-dns.alpha.kubernetes.io/hostname" = local.subdomains.argocd
 
             # Security
-            "alb.ingress.kubernetes.io/security-groups" = data.terraform_remote_state.eks.outputs.cluster_security_group_id
+            "alb.ingress.kubernetes.io/security-groups" = data.aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
           }
 
           hosts = [local.subdomains.argocd]

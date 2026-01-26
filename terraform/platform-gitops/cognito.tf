@@ -19,8 +19,12 @@ resource "aws_cognito_user_pool" "main" {
     temporary_password_validity_days = 7
   }
 
-  # MFA configuration (optional but recommended)
+  # MFA configuration (optional but valid)
   mfa_configuration = "OPTIONAL"
+
+  software_token_mfa_configuration {
+    enabled = true
+  }
 
   # Account recovery
   account_recovery_setting {

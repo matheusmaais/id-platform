@@ -15,13 +15,13 @@ data "aws_iam_policy_document" "external_dns_assume_role" {
 
     condition {
       test     = "StringEquals"
-      variable = "${replace(data.terraform_remote_state.eks.outputs.oidc_provider, "https://", "")}:sub"
+      variable = "${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:sub"
       values   = ["system:serviceaccount:${local.external_dns.namespace}:${local.external_dns.service_account}"]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${replace(data.terraform_remote_state.eks.outputs.oidc_provider, "https://", "")}:aud"
+      variable = "${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:aud"
       values   = ["sts.amazonaws.com"]
     }
   }
