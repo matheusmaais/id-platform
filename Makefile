@@ -1,6 +1,6 @@
-.PHONY: help init-all init-vpc init-eks init-addons plan-all plan-vpc plan-eks plan-addons \
-        apply-vpc apply-eks apply-addons destroy-addons destroy-eks destroy-vpc destroy-cluster \
-        configure-kubectl validate test-karpenter install destroy
+.PHONY: help init-all init-vpc init-eks init-addons init-gitops plan-all plan-vpc plan-eks plan-addons plan-gitops \
+        apply-vpc apply-eks apply-addons apply-gitops destroy-addons destroy-eks destroy-vpc destroy-gitops destroy-cluster \
+        configure-kubectl validate validate-gitops test-karpenter install destroy
 
 AWS_PROFILE := darede
 AWS_REGION := us-east-1
@@ -23,7 +23,11 @@ init-addons: ## Initialize Addons Terraform
 	@echo "==> Initializing Addons..."
 	cd terraform/addons && terraform init -reconfigure -backend-config="profile=$(AWS_PROFILE)"
 
-init-all: init-vpc init-eks init-addons ## Initialize all Terraform modules
+init-gitops: ## Initialize Platform GitOps Terraform
+	@echo "==> Initializing Platform GitOps..."
+	cd terraform/platform-gitops && terraform init -reconfigure -backend-config="profile=$(AWS_PROFILE)"
+
+init-all: init-vpc init-eks init-addons init-gitops ## Initialize all Terraform modules
 
 ##@ Infrastructure - Plan
 
@@ -36,7 +40,10 @@ plan-eks: init-eks ## Plan EKS changes
 plan-addons: init-addons ## Plan addons changes
 	cd terraform/addons && terraform plan
 
-plan-all: plan-vpc plan-eks plan-addons ## Plan all changes
+plan-gitops: init-gitops ## Plan platform GitOps changes
+	cd terraform/platform-gitops && terraform plan
+
+plan-all: plan-vpc plan-eks plan-addons plan-gitops ## Plan all changes
 
 ##@ Infrastructure - Apply (order: VPC -> EKS -> Addons)
 
@@ -52,7 +59,21 @@ apply-addons: init-addons ## Apply addons - Karpenter, NodePool, EC2NodeClass (r
 	@echo "==> Applying Addons..."
 	cd terraform/addons && terraform apply -auto-approve
 
-##@ Infrastructure - Destroy (order: Addons -> EKS -> VPC)
+apply-gitops: init-gitops ## Apply platform GitOps - Cognito, ArgoCD, AWS LB Controller, External-DNS (requires Addons)
+	@echo "==> Applying Platform GitOps..."
+	cd terraform/platform-gitops && terraform apply -auto-approve
+	@echo "==> Waiting for ArgoCD server..."
+	kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || true
+	@echo "\n✅ GitOps stack deployed: https://argocd.timedevops.click"
+
+##@ Infrastructure - Destroy (order: GitOps -> Addons -> EKS -> VPC)
+
+destroy-gitops: init-gitops ## Destroy platform GitOps stack
+	@echo "==> Destroying Platform GitOps..."
+	@echo "Deleting ArgoCD applications first..."
+	kubectl delete applications --all -n argocd --ignore-not-found || true
+	@sleep 10
+	cd terraform/platform-gitops && terraform destroy -auto-approve
 
 destroy-addons: init-addons ## Destroy addons (Karpenter, NodePool, EC2NodeClass)
 	@echo "==> Destroying Addons..."
@@ -66,8 +87,8 @@ destroy-vpc: init-vpc ## Destroy VPC (requires EKS destroyed first)
 	@echo "==> Destroying VPC..."
 	cd terraform/vpc && terraform destroy -auto-approve
 
-destroy-cluster: destroy-addons destroy-eks ## Destroy EKS + Addons only (keeps VPC)
-	@echo "\n✅ EKS cluster and addons destroyed. VPC preserved."
+destroy-cluster: destroy-gitops destroy-addons destroy-eks ## Destroy GitOps + EKS + Addons only (keeps VPC)
+	@echo "\n✅ GitOps, EKS cluster and addons destroyed. VPC preserved."
 
 ##@ Kubernetes
 
@@ -86,6 +107,21 @@ validate: configure-kubectl ## Validate cluster is ready
 	@echo "\n=== Checking cluster info ==="
 	kubectl cluster-info
 
+validate-gitops: configure-kubectl ## Validate GitOps components
+	@echo "=== Checking ArgoCD ==="
+	kubectl get pods -n argocd
+	kubectl get ingress -n argocd
+	@echo "\n=== Checking External-DNS ==="
+	kubectl get pods -n external-dns
+	@echo "\n=== Checking AWS LB Controller ==="
+	kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+	@echo "\n=== Checking DNS resolution ==="
+	dig +short argocd.timedevops.click
+	@echo "\n=== Checking ArgoCD Applications ==="
+	kubectl get applications -n argocd
+	@echo "\n=== ArgoCD URL ==="
+	@echo "https://argocd.timedevops.click"
+
 test-karpenter: configure-kubectl ## Test Karpenter node provisioning
 	@echo "Creating test deployment to trigger Karpenter..."
 	kubectl create deployment nginx --image=nginx --replicas=3 || true
@@ -100,8 +136,11 @@ cleanup-test: configure-kubectl ## Cleanup test deployment
 
 ##@ Complete workflows
 
-install: apply-vpc apply-eks apply-addons configure-kubectl validate ## Install everything (VPC -> EKS -> Addons)
+install: apply-vpc apply-eks apply-addons apply-gitops configure-kubectl validate validate-gitops ## Install everything (VPC -> EKS -> Addons -> GitOps)
 	@echo "\n✅ Platform infrastructure deployed successfully"
+	@echo "\n🎯 Access ArgoCD: https://argocd.timedevops.click"
+	@echo "\n📝 Create admin user:"
+	@cd terraform/platform-gitops && terraform output -raw create_admin_user_command
 
-destroy: destroy-addons destroy-eks destroy-vpc ## Destroy everything (Addons -> EKS -> VPC)
+destroy: destroy-gitops destroy-addons destroy-eks destroy-vpc ## Destroy everything (GitOps -> Addons -> EKS -> VPC)
 	@echo "\n✅ All infrastructure destroyed"
