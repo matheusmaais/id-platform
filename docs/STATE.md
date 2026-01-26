@@ -114,11 +114,28 @@ Branch: platform-gitops-implementation
   - Node provisioning: TESTED & WORKING ✓
   - Remote state: `s3://poc-idp-tfstate/addons/terraform.tfstate`
 
+- [x] **Karpenter** (terraform/addons)
+  - Karpenter v1.8.6 via Helm ✓
+  - EC2NodeClass (AL2023, ARM64) ✓
+  - NodePool (Spot, t4g instances) ✓
+  - Consolidation policy: WhenEmpty ✓
+  - Node provisioning: TESTED & WORKING ✓
+  - Remote state: `s3://poc-idp-tfstate/addons/terraform.tfstate`
+
+- [x] **Platform GitOps** (terraform/platform-gitops)
+  - Cognito User Pool with argocd-admins group ✓
+  - AWS Load Balancer Controller v1.17.1 (IRSA) ✓
+  - ArgoCD v9.3.5 with Cognito SSO ✓
+  - External-DNS v1.20.0 (txt registry) ✓
+  - App-of-apps pattern configured ✓
+  - Remote state: `s3://poc-idp-tfstate/platform-gitops/terraform.tfstate`
+
 - [x] **Makefile Automation**
-  - `make install` — Deploy VPC → EKS → Addons ✓
-  - `make destroy` — Destroy Addons → EKS → VPC ✓
+  - `make install` — Deploy VPC → EKS → Addons → GitOps ✓
+  - `make destroy` — Destroy GitOps → Addons → EKS → VPC ✓
   - `make destroy-cluster` — Destroy only EKS + Addons (keep VPC) ✓
   - `make validate` — Check cluster health ✓
+  - `make validate-gitops` — Check GitOps components ✓
   - `make test-karpenter` — Test node provisioning ✓
 
 ### Validation Results (2026-01-23)
@@ -131,12 +148,15 @@ Branch: platform-gitops-implementation
 ✅ Node Provisioning: Spot t4g.small launched successfully
 ```
 
-### Next Steps (Phase D - GitOps)
-- [ ] Install ArgoCD
-- [ ] Install ingress-nginx
-- [ ] Configure External DNS
-- [ ] Install External Secrets
-- [ ] Configure Cognito authentication
+### Phase 0 - GitOps Implementation Status
+- [x] ✅ Cognito User Pool with OAuth domain
+- [x] ✅ AWS Load Balancer Controller (ALB ingress)
+- [x] ✅ ArgoCD with Cognito SSO (Dex OIDC)
+- [x] ✅ External-DNS with Route53 automation
+- [x] ✅ App-of-apps pattern configured
+- [ ] 🚧 Deploy and validate (pending infrastructure apply)
+
+**Access:** https://argocd.timedevops.click (after deployment)
 
 ---
 
@@ -144,6 +164,9 @@ Branch: platform-gitops-implementation
 
 - Auth: Amazon Cognito (no Keycloak)
 - GitOps: ArgoCD, main branch only
+- Ingress: AWS Load Balancer Controller (ALB) — ingress-nginx deferred
+- DNS: External-DNS with txt registry and txtOwnerId
+- RBAC: Cognito groups (`argocd-admins`) mapped to ArgoCD roles
 - Infra provisioning: Crossplane
 - Secrets: AWS Secrets Manager + External Secrets
 - Rebuild strategy: Destroy first, then install
@@ -172,6 +195,73 @@ Branch: platform-gitops-implementation
 ---
 
 ## 🔄 RECENT CHANGES (Latest First)
+
+### 2026-01-24: Phase 0 GitOps Implementation ✅
+**Status:** ✅ CODE COMPLETE (awaiting deployment)
+
+**What Changed:**
+- Created `terraform/platform-gitops/` stack with 11 Terraform files
+- Implemented Cognito User Pool with OAuth and OIDC
+- Configured ArgoCD with Cognito SSO via Dex
+- Deployed AWS Load Balancer Controller (IRSA)
+- Configured External-DNS with Route53 automation
+- Created app-of-apps pattern structure
+
+**Terraform Stack (`terraform/platform-gitops/`):**
+```
+├── providers.tf          # Backend S3, AWS/K8s/Helm providers
+├── data-sources.tf       # EKS, Route53, ACM lookups
+├── locals.tf             # Domain config, chart versions
+├── variables.tf          # region, cluster_name
+├── cognito.tf            # User Pool + client + groups
+├── aws-lb-controller.tf  # IRSA + Helm v1.17.1
+├── argocd.tf             # Helm v9.3.5 + OIDC + RBAC
+├── external-dns.tf       # IRSA + Helm v1.20.0
+├── argocd-apps.tf        # App-of-apps CRD
+├── outputs.tf            # URLs, IAM ARNs
+└── README.md             # Usage guide
+```
+
+**Component Versions:**
+- AWS Load Balancer Controller: Chart 1.17.1 (9 Jan 2026)
+- ArgoCD: Chart 9.3.5 (23 Jan 2026) → App v3.2.6
+- External-DNS: Chart 1.20.0 (2 Jan 2026) → App v0.20.0
+
+**Key Configurations:**
+- Domain: `timedevops.click` (via data source lookup)
+- ACM cert: `*.timedevops.click` (via data source)
+- Cognito OAuth domain: `idp-poc-darede`
+- ArgoCD URL: `https://argocd.timedevops.click`
+- OIDC issuer: Cognito User Pool
+- RBAC: `argocd-admins` → `role:admin`, default: `role:readonly`
+- External-DNS registry: `txt` with `txtOwnerId` = cluster name
+- External-DNS policy: `upsert-only` (safe mode)
+
+**Makefile Updates:**
+- `make apply-gitops` — Deploy GitOps stack
+- `make destroy-gitops` — Destroy GitOps stack (apps first)
+- `make validate-gitops` — Validate all components
+- `make install` — Now includes GitOps (VPC → EKS → Addons → GitOps)
+- `make destroy` — Proper order (GitOps → Addons → EKS → VPC)
+
+**Directory Structure:**
+- `argocd-apps/platform/` — Created (ready for apps)
+- `docs/PHASE-0-GITOPS.md` — Complete implementation guide
+
+**State Management:**
+- Backend: `s3://poc-idp-tfstate/platform-gitops/terraform.tfstate`
+- Isolated from other stacks
+
+**Next Steps:**
+1. Deploy: `make apply-gitops`
+2. Create ALB IAM policy (one-time setup)
+3. Wait for ALB + DNS propagation (5-10 min)
+4. Create admin user in Cognito
+5. Test SSO: https://argocd.timedevops.click
+6. Validate end-to-end flow
+7. Update STATE.md with validation results
+
+---
 
 ### 2026-01-24: Repository Migration to id-platform ✅
 **Status:** ✅ COMPLETE
