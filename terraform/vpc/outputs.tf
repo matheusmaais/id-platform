@@ -1,0 +1,29 @@
+output "vpc_id" {
+  description = "VPC ID"
+  value       = module.vpc.vpc_id
+}
+
+output "vpc_cidr" {
+  description = "VPC CIDR block"
+  value       = module.vpc.vpc_cidr_block
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs"
+  value       = module.vpc.private_subnets
+}
+
+output "public_subnet_ids" {
+  description = "Public subnet IDs"
+  value       = module.vpc.public_subnets
+}
+
+output "private_subnet_cidrs" {
+  description = "Private subnet CIDR blocks"
+  value       = module.vpc.private_subnets_cidr_blocks
+}
+
+output "azs" {
+  description = "Availability zones used"
+  value       = local.azs
+}

@@ -1,0 +1,61 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+tfplan
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Keep lock files for reproducibility
+!.terraform.lock.hcl
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+
+# Secrets (never commit!)
+*.pem
+*.key
+secrets/
+**/secrets/
+*.tfvars
+!*.tfvars.example
+
+# Generated manifests
+manifests/
+
+# Helm
+**/helm-values.yaml
+!platform/**/helm-values.yaml
+!**/helm-values.yaml.tpl
+
+# Configuration with secrets
+config.yaml
+
+# Kubeconfig
+kubeconfig
+.kube/
+
