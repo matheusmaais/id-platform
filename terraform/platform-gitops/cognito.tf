@@ -143,3 +143,36 @@ resource "aws_cognito_user_group" "argocd_admins" {
   description  = local.cognito.admin_group_description
   precedence   = 1
 }
+
+################################################################################
+# Default Admin User
+# Created automatically on first deployment
+################################################################################
+
+resource "aws_cognito_user" "admin" {
+  user_pool_id = aws_cognito_user_pool.main.id
+  username     = var.cognito_admin_email
+
+  attributes = {
+    email          = var.cognito_admin_email
+    email_verified = true
+  }
+
+  temporary_password = var.cognito_admin_temp_password
+
+  # Force password change on first login
+  message_action = "SUPPRESS"
+
+  lifecycle {
+    ignore_changes = [
+      temporary_password,
+      attributes["email_verified"]
+    ]
+  }
+}
+
+resource "aws_cognito_user_in_group" "admin_in_argocd_admins" {
+  user_pool_id = aws_cognito_user_pool.main.id
+  group_name   = aws_cognito_user_group.argocd_admins.name
+  username     = aws_cognito_user.admin.username
+}

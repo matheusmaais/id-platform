@@ -86,22 +86,26 @@ output "external_dns_role_arn" {
 }
 
 ################################################################################
-# Helpful Commands
+# Login Credentials
 ################################################################################
 
-output "create_admin_user_command" {
-  description = "Command to create an admin user in Cognito"
-  value       = <<-EOT
-    aws cognito-idp admin-create-user \
-      --user-pool-id ${aws_cognito_user_pool.main.id} \
-      --username admin@example.com \
-      --user-attributes Name=email,Value=admin@example.com \
-      --temporary-password TempPass123! \
-      --message-action SUPPRESS
+output "argocd_admin_credentials" {
+  description = "ArgoCD Admin Credentials"
+  value = {
+    url      = "https://${local.subdomains.argocd}"
+    username = "admin"
+    password_command = "kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d"
+  }
+}
 
-    aws cognito-idp admin-add-user-to-group \
-      --user-pool-id ${aws_cognito_user_pool.main.id} \
-      --username admin@example.com \
-      --group-name ${local.cognito.admin_group_name}
-  EOT
+output "cognito_admin_credentials" {
+  description = "Cognito Admin User Credentials (SSO Login)"
+  value = {
+    url               = "https://${local.subdomains.argocd}"
+    login_method      = "LOG IN VIA COGNITO"
+    email             = var.cognito_admin_email
+    temporary_password = var.cognito_admin_temp_password
+    note              = "Password must be changed on first login"
+  }
+  sensitive = true
 }
