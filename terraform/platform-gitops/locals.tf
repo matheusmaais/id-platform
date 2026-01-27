@@ -2,7 +2,17 @@ locals {
   # Domain Configuration
   domain = "timedevops.click"
   subdomains = {
-    argocd = "argocd.${local.domain}"
+    argocd    = "argocd.${local.domain}"
+    backstage = "backstage.${local.domain}"
+    grafana   = "grafana.${local.domain}"
+  }
+
+  # Shared ALB Configuration (IngressGroup)
+  # All platform apps share a single ALB to reduce costs
+  # See: docs/ARCHITECTURE-DECISIONS.md ADR-001
+  shared_alb = {
+    group_name    = "${var.environment}-platform"
+    security_group_id = data.terraform_remote_state.eks.outputs.platform_alb_security_group_id
   }
 
   # Cognito Configuration

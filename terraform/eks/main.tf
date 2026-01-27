@@ -1,4 +1,52 @@
 ################################################################################
+# Shared Platform ALB Security Group
+# Why: Single ALB for all platform apps (ArgoCD, Backstage, Grafana, etc.)
+# Owned by infra layer, used by apps via IngressGroup annotation
+################################################################################
+
+resource "aws_security_group" "platform_alb" {
+  name        = "${var.cluster_name}-platform-alb"
+  description = "Shared ALB security group for all platform applications"
+  vpc_id      = data.terraform_remote_state.vpc.outputs.vpc_id
+
+  # HTTPS from internet
+  ingress {
+    description = "HTTPS from anywhere"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # HTTP redirect (ALB redirects to HTTPS)
+  ingress {
+    description = "HTTP for redirect to HTTPS"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Egress to VPC (ALB → Pods)
+  egress {
+    description = "All traffic to VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [data.terraform_remote_state.vpc.outputs.vpc_cidr]
+  }
+
+  tags = merge(var.default_tags, {
+    Name = "${var.cluster_name}-platform-alb"
+    Purpose = "Shared ALB for platform apps"
+  })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+################################################################################
 # EKS Cluster
 # Uses terraform-aws-modules/eks - community standard
 # Why: Proven module, handles IRSA, IAM, security best practices
@@ -130,6 +178,19 @@ module "eks" {
   # Tag node security group for Karpenter discovery
   node_security_group_tags = {
     "karpenter.sh/discovery" = var.cluster_name
+  }
+
+  # Additional rules for node security group
+  # Why: Allow shared platform ALB to reach pods on any port
+  node_security_group_additional_rules = {
+    ingress_platform_alb = {
+      description              = "Allow platform ALB to reach pods (all app ports)"
+      protocol                 = "tcp"
+      from_port                = 1024
+      to_port                  = 65535
+      type                     = "ingress"
+      source_security_group_id = aws_security_group.platform_alb.id
+    }
   }
 }
 

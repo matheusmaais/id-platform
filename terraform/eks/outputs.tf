@@ -54,3 +54,22 @@ output "karpenter_queue_name" {
   value       = module.karpenter.queue_name
 }
 
+################################################################################
+# Security Group Outputs
+################################################################################
+
+output "cluster_security_group_id" {
+  description = "EKS cluster security group ID"
+  value       = module.eks.cluster_security_group_id
+}
+
+output "node_security_group_id" {
+  description = "EKS node security group ID"
+  value       = module.eks.node_security_group_id
+}
+
+output "platform_alb_security_group_id" {
+  description = "Shared platform ALB security group ID (for IngressGroup)"
+  value       = aws_security_group.platform_alb.id
+}
+
