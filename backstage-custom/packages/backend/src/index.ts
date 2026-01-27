@@ -6,13 +6,13 @@ const backend = createBackend();
 backend.add(import('@backstage/plugin-auth-backend'));
 backend.add(import('@backstage/plugin-auth-backend-module-oidc-provider'));
 
-// Catalog
-backend.add(import('@backstage/plugin-catalog-backend/alpha'));
-
-// Permission
+// Permission (must be before catalog)
 backend.add(import('@backstage/plugin-permission-backend/alpha'));
 backend.add(
   import('@backstage/plugin-permission-backend-module-allow-all-policy'),
 );
+
+// Catalog
+backend.add(import('@backstage/plugin-catalog-backend/alpha'));
 
 backend.start();
