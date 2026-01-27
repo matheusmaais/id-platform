@@ -17,7 +17,7 @@ infrastructure:
   albGroupName: dev-platform
   clusterName: platform-eks
   awsRegion: us-east-1
-  awsProfile: darede
+  awsProfile: darede  # Change to your AWS CLI profile name
   environment: dev
 
 identity:

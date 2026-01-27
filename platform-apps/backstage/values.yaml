@@ -12,11 +12,11 @@ global:
 backstage:
   replicas: 1
 
-  # Custom image with OIDC support
+  # Custom image with OIDC support (ARM64 for Graviton/t4g)
   image:
     registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com
     repository: backstage-platform
-    tag: "20260127-152032"
+    tag: "20260127-152550"
 
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:

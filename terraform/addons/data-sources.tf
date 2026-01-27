@@ -2,10 +2,10 @@
 data "terraform_remote_state" "eks" {
   backend = "s3"
   config = {
-    bucket  = "poc-idp-tfstate"
-    key     = "eks/terraform.tfstate"
-    region  = "us-east-1"
-    profile = "darede"
+    bucket = "poc-idp-tfstate"
+    key    = "eks/terraform.tfstate"
+    region = "us-east-1"
+    # profile = "default"  # Uncomment and set if using named AWS profile
   }
 }
 

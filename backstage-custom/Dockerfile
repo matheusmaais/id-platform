@@ -1,10 +1,11 @@
 # ============================================================================
 # Backstage Custom Image with OIDC Support
 # Multi-stage build for minimal runtime image
+# Built for ARM64 (AWS Graviton / t4g instances)
 # ============================================================================
 
 # Stage 1: Builder
-FROM node:20-bookworm-slim AS builder
+FROM --platform=linux/arm64 node:20-bookworm-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && \
@@ -35,7 +36,7 @@ RUN yarn workspace backend build
 
 # ============================================================================
 # Stage 2: Runtime
-FROM node:20-bookworm-slim
+FROM --platform=linux/arm64 node:20-bookworm-slim
 
 # Install runtime dependencies only
 RUN apt-get update && \

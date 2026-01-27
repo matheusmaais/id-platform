@@ -41,7 +41,7 @@ output "bootstrap_node_role_name" {
 
 output "configure_kubectl" {
   description = "Command to configure kubectl"
-  value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name} --profile darede"
+  value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
 
 output "karpenter_role_arn" {

@@ -108,9 +108,10 @@ login_to_ecr() {
 build_image() {
     log_info "Building Docker image..."
     log_info "Image: ${FULL_IMAGE}"
+    log_info "Platform: linux/arm64 (AWS Graviton / t4g)"
     
     if docker build \
-        --platform linux/amd64 \
+        --platform linux/arm64 \
         --build-arg BUILDKIT_INLINE_CACHE=1 \
         --tag "${FULL_IMAGE}" \
         --tag "${FULL_IMAGE_LATEST}" \

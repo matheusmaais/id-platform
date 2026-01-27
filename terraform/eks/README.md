@@ -10,8 +10,10 @@ Creates an EKS cluster with:
 ## Usage
 
 ```bash
-# Initialize
-terraform init -backend-config="profile=darede"
+# Initialize (use your AWS profile if needed)
+terraform init
+# Or with named profile:
+# terraform init -backend-config="profile=your-profile"
 
 # Plan
 terraform plan
@@ -20,7 +22,7 @@ terraform plan
 terraform apply -auto-approve
 
 # Configure kubectl
-aws eks update-kubeconfig --region us-east-1 --name platform-eks --profile darede
+aws eks update-kubeconfig --region us-east-1 --name platform-eks
 
 # Verify
 kubectl get nodes

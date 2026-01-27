@@ -319,7 +319,7 @@ resource "helm_release" "aws_lb_controller" {
 
       # Force pod rollout when IRSA role changes
       podAnnotations = {
-        "platform.darede.io/irsa-role-arn" = aws_iam_role.aws_lb_controller.arn
+        "platform.idp/irsa-role-arn" = aws_iam_role.aws_lb_controller.arn
       }
 
       # Resources

@@ -10,8 +10,10 @@ Creates a VPC with:
 ## Usage
 
 ```bash
-# Initialize
-terraform init -backend-config="profile=darede"
+# Initialize (use your AWS profile if needed)
+terraform init
+# Or with named profile:
+# terraform init -backend-config="profile=your-profile"
 
 # Plan
 terraform plan

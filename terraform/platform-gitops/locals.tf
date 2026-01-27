@@ -30,7 +30,7 @@ locals {
   # Cognito Configuration
   cognito = {
     user_pool_name          = "${local.cluster_name}-user-pool"
-    oauth_domain_prefix     = "idp-poc-darede"
+    oauth_domain_prefix     = "idp-${local.environment}-platform"
     argocd_client_name      = "argocd"
     admin_group_name        = "argocd-admins"
     admin_group_description = "ArgoCD Administrators with full access"
