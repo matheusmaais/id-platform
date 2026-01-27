@@ -1,4 +1,78 @@
 ################################################################################
+# ArgoCD ALB Security Group
+################################################################################
+
+resource "aws_security_group" "argocd_alb" {
+  name        = "${var.cluster_name}-argocd-alb"
+  description = "Security group for ArgoCD ALB"
+  vpc_id      = data.terraform_remote_state.vpc.outputs.vpc_id
+
+  ingress {
+    description = "HTTPS from anywhere"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "All traffic to VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [data.terraform_remote_state.vpc.outputs.vpc_cidr]
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.cluster_name}-argocd-alb"
+    }
+  )
+}
+
+# Get node security group by EKS cluster tag
+data "aws_security_groups" "node" {
+  filter {
+    name   = "vpc-id"
+    values = [data.terraform_remote_state.vpc.outputs.vpc_id]
+  }
+
+  filter {
+    name   = "group-name"
+    values = ["*-node-*"]
+  }
+
+  filter {
+    name   = "tag:aws:eks:cluster-name"
+    values = [data.aws_eks_cluster.main.name]
+  }
+}
+
+# Allow ALB to reach pods in the cluster (cluster security group)
+resource "aws_security_group_rule" "argocd_alb_to_cluster" {
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.argocd_alb.id
+  security_group_id        = data.aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  description              = "Allow ArgoCD ALB to reach ArgoCD server pods"
+}
+
+# Allow ALB to reach pods on nodes (node security group)
+resource "aws_security_group_rule" "argocd_alb_to_nodes" {
+  count                    = length(data.aws_security_groups.node.ids) > 0 ? 1 : 0
+  type                     = "ingress"
+  from_port                = 8080
+  to_port                  = 8080
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.argocd_alb.id
+  security_group_id        = data.aws_security_groups.node.ids[0]
+  description              = "Allow ArgoCD ALB to reach ArgoCD server pods on nodes"
+}
+
+################################################################################
 # ArgoCD Helm Release with Cognito OIDC
 ################################################################################
 
@@ -78,7 +152,8 @@ resource "helm_release" "argocd" {
         params = {
           # Server configuration
           "server.insecure"                    = "true" # TLS terminated at ALB
-          "server.rootpath"                    = "/"
+          "server.basehref"                    = "/"
+          "server.rootpath"                    = ""
           "server.disable.auth"                = "false"
           "server.enable.gzip"                 = "true"
           "server.x.frame.options"             = "sameorigin"
@@ -132,8 +207,8 @@ resource "helm_release" "argocd" {
             # External DNS
             "external-dns.alpha.kubernetes.io/hostname" = local.subdomains.argocd
 
-            # Security
-            "alb.ingress.kubernetes.io/security-groups" = data.aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+            # Security - dedicated ALB security group with HTTPS ingress
+            "alb.ingress.kubernetes.io/security-groups" = aws_security_group.argocd_alb.id
           }
 
           hosts = [local.subdomains.argocd]
