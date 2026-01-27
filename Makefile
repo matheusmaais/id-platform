@@ -136,13 +136,16 @@ cleanup-test: configure-kubectl ## Cleanup test deployment
 
 ##@ Platform Applications (GitOps)
 
-bootstrap-platform: configure-kubectl ## Create platform-apps ApplicationSet
+validate-params: ## Validate platform parametrization (Git config + ConfigMap + ApplicationSet)
+	@./scripts/validate-params.sh
+
+bootstrap-platform: validate-params configure-kubectl ## Create platform-apps ApplicationSet (validates params first)
 	@echo "=== Creating Platform ApplicationSet ==="
 	kubectl apply -f argocd-apps/platform/backstage-appset.yaml
 	@echo "✅ ApplicationSet created. ArgoCD will sync automatically."
 	@echo "Monitor: kubectl get applications -n argocd -w"
 
-install-backstage: bootstrap-platform ## Install Backstage (via ApplicationSet)
+install-backstage: bootstrap-platform ## Install Backstage (via ApplicationSet, validates params first)
 	@echo "=== Waiting for Backstage Application ==="
 	kubectl wait --for=condition=Ready application/backstage -n argocd --timeout=60s || true
 	@echo "=== Checking Backstage sync status ==="
@@ -152,9 +155,6 @@ install-backstage: bootstrap-platform ## Install Backstage (via ApplicationSet)
 	@echo "\n✅ Backstage deployed"
 	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo "backstage.timedevops.click"); \
 	echo "URL: https://$$BACKSTAGE_DOMAIN"
-
-validate-params: ## Validate platform parametrization (Git config + ConfigMap + ApplicationSet)
-	@./scripts/validate-params.sh
 
 validate-platform: configure-kubectl ## Validate platform applications deployment
 	@echo "=== Checking Platform ApplicationSet ==="
