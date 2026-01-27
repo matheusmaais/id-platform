@@ -517,6 +517,54 @@ karpenter-node-group   True
 
 ## 📝 RECENT CHANGES
 
+### 2026-01-27: Shared ALB Architecture (ADR-001, ADR-002)
+
+**Problem:**
+- Each Ingress creates a separate ALB (~$16/month each)
+- Security groups managed at app layer (coupling, duplication)
+- Port 8080 hardcoded (doesn't scale to multiple apps)
+
+**Solution: Shared ALB via IngressGroup**
+
+**Architecture Changes:**
+
+1. **`terraform/eks/main.tf`** (Infrastructure Layer)
+   - Created `aws_security_group.platform_alb` - shared by all platform apps
+   - Added `node_security_group_additional_rules` for ALB → pods (ports 1024-65535)
+   - Exported `platform_alb_security_group_id`, `node_security_group_id`, `cluster_security_group_id`
+
+2. **`terraform/platform-gitops/locals.tf`**
+   - Added `shared_alb` config with IngressGroup name: `dev-platform`
+   - References shared SG from EKS module
+
+3. **`terraform/platform-gitops/argocd.tf`**
+   - Removed per-app security groups (`argocd_alb`)
+   - ArgoCD now uses IngressGroup annotation: `alb.ingress.kubernetes.io/group.name: dev-platform`
+   - All future apps will share the same ALB
+
+4. **`docs/ARCHITECTURE-DECISIONS.md`** (NEW)
+   - ADR-001: Shared ALB Strategy (cost reduction)
+   - ADR-002: Security Group Ownership (infra vs app layer)
+   - ADR-003: Port Range 1024-65535 (covers all app ports)
+   - ADR-004: IngressGroup Naming Convention
+
+**Benefits:**
+- Single ALB for all platform apps (ArgoCD, Backstage, Grafana, etc.)
+- ~$16/month savings per additional app
+- Security groups owned by infra layer (EKS module)
+- Scalable to N applications without SG changes
+
+**Validation:**
+```bash
+make validate-gitops  # ✅ All checks pass
+curl https://argocd.timedevops.click  # ✅ HTTP 200
+kubectl get ingress -n argocd  # ✅ ALB: k8s-devplatform-*
+```
+
+**Status:** Shared ALB operational, ArgoCD accessible, architecture ready for new apps.
+
+---
+
 ### 2026-01-27: GitOps Fixes - ALB Connectivity & ArgoCD
 
 **Issues Fixed:**
@@ -534,9 +582,9 @@ karpenter-node-group   True
   - Added `aws_security_group_rule.argocd_alb_to_cluster` for ALB→cluster SG
   - Fixed ArgoCD params: `server.basehref = "/"`, `server.rootpath = ""`
 
-**Manual Step Required:**
-- Added SG rule to node security group (`sg-0af4edc484e912aa3`) via AWS CLI
-- TODO: Export node SG from EKS module and manage via Terraform
+**Manual Step (Now Managed via Terraform):**
+- ~~Added SG rule to node security group via AWS CLI~~
+- ✅ Now managed via EKS module `node_security_group_additional_rules`
 
 **Validation:**
 ```bash
