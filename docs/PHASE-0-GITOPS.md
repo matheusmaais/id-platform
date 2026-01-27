@@ -547,7 +547,7 @@ Add to `argocd-apps/platform/`:
 ### Validation Commands
 ```bash
 # 1) ALB target health
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --profile darede --region us-east-1
+aws elbv2 describe-target-health --target-group-arn <tg-arn> --region us-east-1
 
 # 2) ArgoCD UI (should be 200)
 curl -I https://argocd.timedevops.click

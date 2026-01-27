@@ -443,8 +443,9 @@ kubectl port-forward -n backstage svc/backstage 7007:7007
 
 **Next Step:** User needs to run:
 ```bash
-export AWS_PROFILE=darede
-aws sso login --profile darede
+# Configure AWS credentials if needed
+# export AWS_PROFILE=your-profile
+# aws sso login --profile your-profile
 cd cluster/terraform
 terraform apply -target=aws_iam_policy.crossplane
 ```

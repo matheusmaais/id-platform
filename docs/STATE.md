@@ -265,6 +265,41 @@ Branch: main
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-27: Backstage ArgoCD Sync Fixed ✅
+**Status:** ✅ COMPLETE (Backstage Synced and Healthy)
+
+**Problem:**
+- Backstage Application showing `OutOfSync` status despite being healthy
+- Root cause: PostgreSQL Helm chart generates random `postgres-password` on each sync
+- This caused perpetual drift detection in ArgoCD
+
+**Solution:**
+- Added `ignoreDifferences` configuration to ApplicationSet:
+```yaml
+ignoreDifferences:
+  - kind: Secret
+    name: backstage-postgresql
+    jsonPointers:
+      - /data/postgres-password
+```
+- Recreated ApplicationSet to apply new configuration
+- Commit: 099265b
+
+**Validation:**
+```bash
+kubectl get application backstage -n argocd
+# NAME        SYNC STATUS   HEALTH STATUS
+# backstage   Synced        Healthy
+```
+
+**Result:**
+- ✅ Backstage Application now shows Synced status
+- ✅ No more perpetual OutOfSync alerts
+- ✅ ArgoCD properly ignores Helm-generated password drift
+- ✅ Best practice for Helm-managed secrets applied
+
+---
+
 ### 2026-01-27: Backstage Deployment Fixed ✅
 **Status:** ✅ COMPLETE (Backstage healthy and accessible)
 

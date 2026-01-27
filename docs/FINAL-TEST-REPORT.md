@@ -338,10 +338,11 @@ docs/
 
 ## 🚨 Ações Pendentes
 
-### 1. AWS SSO Login (URGENTE)
+### 1. AWS Authentication
 ```bash
-export AWS_PROFILE=darede
-aws sso login --profile darede
+# If using named profile:
+# export AWS_PROFILE=your-profile
+# aws sso login --profile your-profile
 ```
 
 ### 2. Aplicar Correção IAM

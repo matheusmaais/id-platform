@@ -86,7 +86,7 @@
 ## How to Deploy
 
 ### 1. Prerequisites
-- AWS CLI configured with profile `darede`
+- AWS CLI configured (with credentials or named profile)
 - Terraform >= 1.10
 - kubectl installed
 - S3 bucket `poc-idp-tfstate` exists
@@ -196,7 +196,7 @@ Phase C completed the foundation. Still needed:
 ## Notes
 
 - All Terraform uses S3 backend with state locking
-- AWS profile `darede` required for all operations
+- AWS credentials required for all operations (via default profile or named profile)
 - Bootstrap nodes are intentionally small (cost optimization)
 - Karpenter will provision larger nodes as needed
 - Documentation embedded in each Terraform module
