@@ -18,9 +18,9 @@ backstage:
     repository: backstage-platform
     tag: "20260127-153442"
 
-  # Override command to use our entrypoint script
-  command: ["/usr/local/bin/docker-entrypoint.sh"]
-  args: ["node", "packages/backend", "--config", "/app/app-config-from-configmap.yaml"]
+  # Override command to use our entrypoint script that extracts the bundle
+  command: ["/usr/local/bin/docker-entrypoint.sh", "node", "packages/backend"]
+  args: []
 
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:
