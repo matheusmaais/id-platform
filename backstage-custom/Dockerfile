@@ -57,6 +57,10 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/packages/backend/dist ./packages/backend/dist
 COPY --from=builder --chown=node:node /app/packages/backend/package.json ./packages/backend/
 
+# Copy entrypoint script
+COPY --chown=node:node docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Switch to non-root user
 USER node
 
@@ -67,5 +71,8 @@ EXPOSE 7007
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:7007/healthcheck || exit 1
 
-# Extract bundle and start backend
-CMD ["sh", "-c", "tar -xzf packages/backend/dist/bundle.tar.gz && node packages/backend/dist/index.cjs.js"]
+# Set entrypoint to extract bundle before running any command
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command (can be overridden by Helm)
+CMD ["node", "packages/backend"]
