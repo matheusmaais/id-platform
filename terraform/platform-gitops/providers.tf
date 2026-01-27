@@ -18,6 +18,10 @@ terraform {
       source  = "gavinbunney/kubectl"
       version = "~> 1.19"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 
   backend "s3" {
@@ -30,10 +34,10 @@ terraform {
 }
 
 provider "aws" {
-  region = var.region
+  region = local.region
 
   default_tags {
-    tags = var.default_tags
+    tags = local.default_tags
   }
 }
 

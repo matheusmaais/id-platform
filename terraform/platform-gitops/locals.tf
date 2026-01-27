@@ -1,6 +1,18 @@
 locals {
+  platform_config = yamldecode(file("${path.module}/../../config/platform-params.yaml"))
+
+  region                      = local.platform_config.infrastructure.awsRegion
+  environment                 = local.platform_config.infrastructure.environment
+  cluster_name                = local.platform_config.infrastructure.clusterName
+  domain                      = local.platform_config.infrastructure.domain
+  default_tags                = local.platform_config.tags
+  cognito_admin_email         = local.platform_config.identity.cognitoAdminEmail
+  cognito_admin_temp_password = var.cognito_admin_temp_password
+  platform_repo_url           = local.platform_config.repository.url
+  github_username             = "x-access-token"
+  github_repo_creds_url       = element(regexall("^https?://[^/]+", local.platform_repo_url), 0)
+
   # Domain Configuration
-  domain = "timedevops.click"
   subdomains = {
     argocd    = "argocd.${local.domain}"
     backstage = "backstage.${local.domain}"
@@ -11,13 +23,13 @@ locals {
   # All platform apps share a single ALB to reduce costs
   # See: docs/ARCHITECTURE-DECISIONS.md ADR-001
   shared_alb = {
-    group_name    = "${var.environment}-platform"
+    group_name        = "${local.environment}-platform"
     security_group_id = data.terraform_remote_state.eks.outputs.platform_alb_security_group_id
   }
 
   # Cognito Configuration
   cognito = {
-    user_pool_name          = "${var.cluster_name}-user-pool"
+    user_pool_name          = "${local.cluster_name}-user-pool"
     oauth_domain_prefix     = "idp-poc-darede"
     argocd_client_name      = "argocd"
     admin_group_name        = "argocd-admins"
@@ -45,17 +57,17 @@ locals {
     namespace       = "external-dns"
     service_account = "external-dns"
     chart_version   = "1.20.0"
-    txt_owner_id    = var.cluster_name
+    txt_owner_id    = local.cluster_name
     policy          = "upsert-only"
   }
 
   # Common Tags
   common_tags = merge(
-    var.default_tags,
+    local.default_tags,
     {
       Stack       = "platform-gitops"
       ManagedBy   = "terraform"
-      Environment = var.environment
+      Environment = local.environment
     }
   )
 }

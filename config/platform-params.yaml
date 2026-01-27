@@ -15,6 +15,17 @@ infrastructure:
   domain: timedevops.click
   backstageDomain: backstage.timedevops.click
   albGroupName: dev-platform
+  clusterName: platform-eks
+  awsRegion: us-east-1
+  awsProfile: darede
+  environment: dev
+
+identity:
+  cognitoAdminEmail: admin@timedevops.click
+
+tags:
+  Project: Internal Developer Platform
+  Terraform: "true"
 
 charts:
   backstage:

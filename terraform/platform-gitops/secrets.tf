@@ -3,6 +3,64 @@
 # Managed by Terraform, consumed by platform applications
 ################################################################################
 
+# ArgoCD Repository Credentials (GitHub token)
+resource "kubernetes_secret" "argocd_repo" {
+  metadata {
+    name      = "repo-id-platform"
+    namespace = local.argocd.namespace
+    labels = {
+      "app.kubernetes.io/managed-by"   = "terraform"
+      "app.kubernetes.io/part-of"      = "platform-gitops"
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+    annotations = {
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+  }
+
+  data = {
+    url      = local.platform_repo_url
+    username = local.github_username
+    password = var.github_token
+    type     = "git"
+  }
+
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# ArgoCD Repository Credentials (repo-creds for ApplicationSet git generator)
+resource "kubernetes_secret" "argocd_repo_creds" {
+  metadata {
+    name      = "repo-creds-github"
+    namespace = local.argocd.namespace
+    labels = {
+      "app.kubernetes.io/managed-by"   = "terraform"
+      "app.kubernetes.io/part-of"      = "platform-gitops"
+      "argocd.argoproj.io/secret-type" = "repo-creds"
+    }
+    annotations = {
+      "argocd.argoproj.io/secret-type" = "repo-creds"
+    }
+  }
+
+  data = {
+    url      = local.github_repo_creds_url
+    username = local.github_username
+    password = var.github_token
+    type     = "git"
+  }
+
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
 # Backstage Cognito Credentials
 resource "kubernetes_secret" "backstage_cognito" {
   metadata {
@@ -23,7 +81,8 @@ resource "kubernetes_secret" "backstage_cognito" {
   type = "Opaque"
 
   depends_on = [
-    helm_release.argocd
+    helm_release.argocd,
+    kubernetes_namespace.backstage
   ]
 }
 
@@ -51,6 +110,7 @@ resource "kubernetes_secret" "backstage_postgresql" {
   type = "Opaque"
 
   depends_on = [
-    helm_release.argocd
+    helm_release.argocd,
+    kubernetes_namespace.backstage
   ]
 }

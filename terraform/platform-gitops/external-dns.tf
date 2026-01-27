@@ -28,13 +28,13 @@ data "aws_iam_policy_document" "external_dns_assume_role" {
 }
 
 resource "aws_iam_role" "external_dns" {
-  name               = "${var.cluster_name}-external-dns"
+  name               = "${local.cluster_name}-external-dns"
   assume_role_policy = data.aws_iam_policy_document.external_dns_assume_role.json
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.cluster_name}-external-dns"
+      Name = "${local.cluster_name}-external-dns"
     }
   )
 }
@@ -62,14 +62,14 @@ data "aws_iam_policy_document" "external_dns" {
 }
 
 resource "aws_iam_policy" "external_dns" {
-  name        = "${var.cluster_name}-external-dns"
+  name        = "${local.cluster_name}-external-dns"
   description = "IAM policy for External-DNS to manage Route53 records"
   policy      = data.aws_iam_policy_document.external_dns.json
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.cluster_name}-external-dns"
+      Name = "${local.cluster_name}-external-dns"
     }
   )
 }
@@ -100,9 +100,9 @@ resource "helm_release" "external_dns" {
 
       # AWS-specific configuration
       aws = {
-        region         = data.aws_region.current.name
-        zoneType       = "public"
-        assumeRoleArn  = ""  # Using IRSA instead
+        region          = data.aws_region.current.name
+        zoneType        = "public"
+        assumeRoleArn   = "" # Using IRSA instead
         batchChangeSize = 1000
       }
 
@@ -119,10 +119,10 @@ resource "helm_release" "external_dns" {
       zoneIdFilters = [data.aws_route53_zone.main.zone_id]
 
       # Policy
-      policy = local.external_dns.policy  # upsert-only
+      policy = local.external_dns.policy # upsert-only
 
       # Registry configuration
-      registry = "txt"
+      registry   = "txt"
       txtOwnerId = local.external_dns.txt_owner_id
       txtPrefix  = "external-dns-"
 

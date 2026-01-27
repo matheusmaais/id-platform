@@ -62,12 +62,122 @@ resource "aws_cognito_user_pool" "main" {
     advanced_security_mode = "ENFORCED"
   }
 
+  # Lambda trigger for Pre Token Generation V2
+  # This adds cognito:groups claim to ID token for OIDC clients
+  lambda_config {
+    pre_token_generation_config {
+      lambda_arn     = aws_lambda_function.pre_token_generation.arn
+      lambda_version = "V2_0"
+    }
+  }
+
   tags = merge(
     local.common_tags,
     {
       Name = local.cognito.user_pool_name
     }
   )
+
+  depends_on = [
+    aws_lambda_permission.cognito_invoke
+  ]
+}
+
+################################################################################
+# Pre-Token Generation Lambda
+# Adds cognito:groups claim to ID token for OIDC integration
+################################################################################
+
+data "aws_iam_policy_document" "lambda_assume_role" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "pre_token_generation" {
+  name               = "${local.cluster_name}-cognito-pre-token-gen"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.cluster_name}-cognito-pre-token-gen"
+    }
+  )
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.pre_token_generation.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Lambda function code
+data "archive_file" "pre_token_generation" {
+  type        = "zip"
+  output_path = "${path.module}/lambda/pre_token_generation.zip"
+
+  source {
+    content  = <<-EOF
+      exports.handler = async (event) => {
+        // V2_0 Pre Token Generation Lambda
+        // Adds cognito:groups to ID token claims for OIDC
+        console.log('Event:', JSON.stringify(event, null, 2));
+        
+        const groups = event.request.groupConfiguration.groupsToOverride || [];
+        
+        // Return the response with groups claim added to ID token
+        event.response = {
+          claimsAndScopeOverrideDetails: {
+            idTokenGeneration: {
+              claimsToAddOrOverride: {
+                "cognito:groups": JSON.stringify(groups)
+              }
+            },
+            accessTokenGeneration: {
+              claimsToAddOrOverride: {
+                "cognito:groups": JSON.stringify(groups)
+              }
+            }
+          }
+        };
+        
+        console.log('Response:', JSON.stringify(event.response, null, 2));
+        return event;
+      };
+    EOF
+    filename = "index.js"
+  }
+}
+
+resource "aws_lambda_function" "pre_token_generation" {
+  function_name    = "${local.cluster_name}-cognito-pre-token-gen"
+  filename         = data.archive_file.pre_token_generation.output_path
+  source_code_hash = data.archive_file.pre_token_generation.output_base64sha256
+  handler          = "index.handler"
+  runtime          = "nodejs20.x"
+  role             = aws_iam_role.pre_token_generation.arn
+  timeout          = 10
+  memory_size      = 128
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.cluster_name}-cognito-pre-token-gen"
+    }
+  )
+}
+
+resource "aws_lambda_permission" "cognito_invoke" {
+  statement_id  = "AllowCognitoInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.pre_token_generation.function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = "arn:aws:cognito-idp:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:userpool/*"
 }
 
 ################################################################################
@@ -108,9 +218,9 @@ resource "aws_cognito_user_pool_client" "argocd" {
   supported_identity_providers = ["COGNITO"]
 
   # Token validity
-  id_token_validity      = 60  # 1 hour
-  access_token_validity  = 60  # 1 hour
-  refresh_token_validity = 30  # 30 days
+  id_token_validity      = 60 # 1 hour
+  access_token_validity  = 60 # 1 hour
+  refresh_token_validity = 30 # 30 days
 
   token_validity_units {
     id_token      = "minutes"
@@ -162,9 +272,9 @@ resource "aws_cognito_user_pool_client" "backstage" {
   supported_identity_providers = ["COGNITO"]
 
   # Token validity
-  id_token_validity      = 60  # 1 hour
-  access_token_validity  = 60  # 1 hour
-  refresh_token_validity = 30  # 30 days
+  id_token_validity      = 60 # 1 hour
+  access_token_validity  = 60 # 1 hour
+  refresh_token_validity = 30 # 30 days
 
   token_validity_units {
     id_token      = "minutes"
@@ -204,14 +314,14 @@ resource "aws_cognito_user_group" "argocd_admins" {
 
 resource "aws_cognito_user" "admin" {
   user_pool_id = aws_cognito_user_pool.main.id
-  username     = var.cognito_admin_email
+  username     = local.cognito_admin_email
 
   attributes = {
-    email          = var.cognito_admin_email
+    email          = local.cognito_admin_email
     email_verified = true
   }
 
-  temporary_password = var.cognito_admin_temp_password
+  temporary_password = local.cognito_admin_temp_password
 
   # Force password change on first login
   message_action = "SUPPRESS"

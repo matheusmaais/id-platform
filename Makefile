@@ -1,31 +1,52 @@
 .PHONY: help init-all init-vpc init-eks init-addons init-gitops plan-all plan-vpc plan-eks plan-addons plan-gitops \
         apply-vpc apply-eks apply-addons apply-gitops destroy-addons destroy-eks destroy-vpc destroy-gitops destroy-cluster \
-        configure-kubectl validate validate-gitops test-karpenter install destroy
+        configure-kubectl validate validate-gitops test-karpenter install destroy validate-env validate-params status
 
-AWS_PROFILE := darede
-AWS_REGION := us-east-1
-CLUSTER_NAME := platform-eks
+ENV_FILE ?= .env
+ENV_LOADER = set -a; [ -f "$(ENV_FILE)" ] && . "$(ENV_FILE)"; set +a
+CONFIG_FILE ?= config/platform-params.yaml
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+status: configure-kubectl ## Show platform installation status checklist
+	@echo "=== Platform Status ==="
+	@DOMAIN=$$(yq eval '.infrastructure.domain' config/platform-params.yaml 2>/dev/null || echo ""); \
+	BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo ""); \
+	echo ""; \
+	if kubectl get deployment/argocd-server -n argocd >/dev/null 2>&1; then echo "[x] apply-gitops"; else echo "[ ] apply-gitops"; fi; \
+	if kubectl get applicationset/platform-apps -n argocd >/dev/null 2>&1; then echo "[x] bootstrap-platform"; else echo "[ ] bootstrap-platform"; fi; \
+	if kubectl get application/backstage -n argocd >/dev/null 2>&1; then echo "[x] install-backstage"; else echo "[ ] install-backstage"; fi; \
+	if kubectl get ingress -n backstage >/dev/null 2>&1; then echo "[x] validate-platform"; else echo "[ ] validate-platform"; fi; \
+	echo ""; \
+	echo "ArgoCD URL: https://argocd.$$DOMAIN"; \
+	echo "Backstage URL: https://$$BACKSTAGE_DOMAIN"
+
+validate-env: ## Validate required environment variables in .env
+	@SKIP_K8S_CHECKS=1 ./scripts/validate-params.sh >/dev/null
+	@echo "✅ Environment validation passed"
+
 ##@ Infrastructure - Init
 
-init-vpc: ## Initialize VPC Terraform
+init-vpc: validate-env ## Initialize VPC Terraform
 	@echo "==> Initializing VPC..."
-	cd terraform/vpc && terraform init -reconfigure -backend-config="profile=$(AWS_PROFILE)"
+	@PROFILE=$$(yq eval '.infrastructure.awsProfile' $(CONFIG_FILE)); \
+	cd terraform/vpc && terraform init -reconfigure -backend-config="profile=$$PROFILE"
 
-init-eks: ## Initialize EKS Terraform
+init-eks: validate-env ## Initialize EKS Terraform
 	@echo "==> Initializing EKS..."
-	cd terraform/eks && terraform init -reconfigure -backend-config="profile=$(AWS_PROFILE)"
+	@PROFILE=$$(yq eval '.infrastructure.awsProfile' $(CONFIG_FILE)); \
+	cd terraform/eks && terraform init -reconfigure -backend-config="profile=$$PROFILE"
 
-init-addons: ## Initialize Addons Terraform
+init-addons: validate-env ## Initialize Addons Terraform
 	@echo "==> Initializing Addons..."
-	cd terraform/addons && terraform init -reconfigure -backend-config="profile=$(AWS_PROFILE)"
+	@PROFILE=$$(yq eval '.infrastructure.awsProfile' $(CONFIG_FILE)); \
+	cd terraform/addons && terraform init -reconfigure -backend-config="profile=$$PROFILE"
 
-init-gitops: ## Initialize Platform GitOps Terraform
+init-gitops: validate-env ## Initialize Platform GitOps Terraform
 	@echo "==> Initializing Platform GitOps..."
-	cd terraform/platform-gitops && terraform init -reconfigure -backend-config="profile=$(AWS_PROFILE)"
+	@PROFILE=$$(yq eval '.infrastructure.awsProfile' $(CONFIG_FILE)); \
+	cd terraform/platform-gitops && terraform init -reconfigure -backend-config="profile=$$PROFILE"
 
 init-all: init-vpc init-eks init-addons init-gitops ## Initialize all Terraform modules
 
@@ -49,22 +70,31 @@ plan-all: plan-vpc plan-eks plan-addons plan-gitops ## Plan all changes
 
 apply-vpc: init-vpc ## Apply VPC infrastructure
 	@echo "==> Applying VPC..."
-	cd terraform/vpc && terraform apply -auto-approve
+	@cd terraform/vpc && terraform apply -auto-approve
 
 apply-eks: init-eks ## Apply EKS infrastructure (requires VPC)
 	@echo "==> Applying EKS..."
-	cd terraform/eks && terraform apply -auto-approve
+	@cd terraform/eks && terraform apply -auto-approve
 
 apply-addons: init-addons ## Apply addons - Karpenter, NodePool, EC2NodeClass (requires EKS)
 	@echo "==> Applying Addons..."
-	cd terraform/addons && terraform apply -auto-approve
+	@cd terraform/addons && terraform apply -auto-approve
 
 apply-gitops: init-gitops ## Apply platform GitOps - Cognito, ArgoCD, AWS LB Controller, External-DNS (requires Addons)
 	@echo "==> Applying Platform GitOps..."
+	@$(ENV_LOADER); \
+	export TF_VAR_github_token=$$GITHUB_TOKEN; \
+	export TF_VAR_cognito_admin_temp_password=$$COGNITO_ADMIN_TEMP_PASSWORD; \
 	cd terraform/platform-gitops && terraform apply -auto-approve
 	@echo "==> Waiting for ArgoCD server..."
 	kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || true
-	@echo "\n✅ GitOps stack deployed: https://argocd.timedevops.click"
+	@DOMAIN=$$(yq eval '.infrastructure.domain' config/platform-params.yaml 2>/dev/null || echo ""); \
+	echo "\n✅ GitOps stack deployed: https://argocd.$$DOMAIN"
+	@echo "\nNext steps:"
+	@echo "  [x] apply-gitops"
+	@echo "  [ ] bootstrap-platform   (run: make bootstrap-platform)"
+	@echo "  [ ] install-backstage    (run: make install-backstage)"
+	@echo "  [ ] validate-platform    (run: make validate-platform)"
 
 ##@ Infrastructure - Destroy (order: GitOps -> Addons -> EKS -> VPC)
 
@@ -73,27 +103,30 @@ destroy-gitops: init-gitops ## Destroy platform GitOps stack
 	@echo "Deleting ArgoCD applications first..."
 	kubectl delete applications --all -n argocd --ignore-not-found || true
 	@sleep 10
-	cd terraform/platform-gitops && terraform destroy -auto-approve
+	@$(ENV_LOADER); cd terraform/platform-gitops && terraform destroy -auto-approve
 
 destroy-addons: init-addons ## Destroy addons (Karpenter, NodePool, EC2NodeClass)
 	@echo "==> Destroying Addons..."
-	cd terraform/addons && terraform destroy -auto-approve
+	@$(ENV_LOADER); cd terraform/addons && terraform destroy -auto-approve
 
 destroy-eks: init-eks ## Destroy EKS cluster and node groups
 	@echo "==> Destroying EKS..."
-	cd terraform/eks && terraform destroy -auto-approve
+	@$(ENV_LOADER); cd terraform/eks && terraform destroy -auto-approve
 
 destroy-vpc: init-vpc ## Destroy VPC (requires EKS destroyed first)
 	@echo "==> Destroying VPC..."
-	cd terraform/vpc && terraform destroy -auto-approve
+	@$(ENV_LOADER); cd terraform/vpc && terraform destroy -auto-approve
 
 destroy-cluster: destroy-gitops destroy-addons destroy-eks ## Destroy GitOps + EKS + Addons only (keeps VPC)
 	@echo "\n✅ GitOps, EKS cluster and addons destroyed. VPC preserved."
 
 ##@ Kubernetes
 
-configure-kubectl: ## Configure kubectl for EKS cluster
-	aws eks update-kubeconfig --region $(AWS_REGION) --name $(CLUSTER_NAME) --profile $(AWS_PROFILE)
+configure-kubectl: validate-env ## Configure kubectl for EKS cluster
+	@REGION=$$(yq eval '.infrastructure.awsRegion' $(CONFIG_FILE)); \
+	CLUSTER=$$(yq eval '.infrastructure.clusterName' $(CONFIG_FILE)); \
+	PROFILE=$$(yq eval '.infrastructure.awsProfile' $(CONFIG_FILE)); \
+	aws eks update-kubeconfig --region $$REGION --name $$CLUSTER --profile $$PROFILE
 
 validate: configure-kubectl ## Validate cluster is ready
 	@echo "=== Checking nodes ==="
@@ -116,11 +149,13 @@ validate-gitops: configure-kubectl ## Validate GitOps components
 	@echo "\n=== Checking AWS LB Controller ==="
 	kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
 	@echo "\n=== Checking DNS resolution ==="
-	dig +short argocd.timedevops.click
+	@DOMAIN=$$(yq eval '.infrastructure.domain' config/platform-params.yaml 2>/dev/null || echo ""); \
+	dig +short argocd.$$DOMAIN
 	@echo "\n=== Checking ArgoCD Applications ==="
 	kubectl get applications -n argocd
 	@echo "\n=== ArgoCD URL ==="
-	@echo "https://argocd.timedevops.click"
+	@DOMAIN=$$(yq eval '.infrastructure.domain' config/platform-params.yaml 2>/dev/null || echo ""); \
+	echo "https://argocd.$$DOMAIN"
 
 test-karpenter: configure-kubectl ## Test Karpenter node provisioning
 	@echo "Creating test deployment to trigger Karpenter..."
@@ -138,12 +173,24 @@ cleanup-test: configure-kubectl ## Cleanup test deployment
 
 validate-params: ## Validate platform parametrization (Git config + ConfigMap + ApplicationSet)
 	@./scripts/validate-params.sh
+ifneq ($(filter validate-params,$(MAKECMDGOALS)),)
+	@echo "\nNext steps:"
+	@echo "  [ ] apply-gitops          (run: make apply-gitops)"
+	@echo "  [ ] bootstrap-platform    (run: make bootstrap-platform)"
+	@echo "  [ ] install-backstage     (run: make install-backstage)"
+	@echo "  [ ] validate-platform     (run: make validate-platform)"
+endif
 
 bootstrap-platform: validate-params configure-kubectl ## Create platform-apps ApplicationSet (validates params first)
 	@echo "=== Creating Platform ApplicationSet ==="
 	kubectl apply -f argocd-apps/platform/backstage-appset.yaml
 	@echo "✅ ApplicationSet created. ArgoCD will sync automatically."
 	@echo "Monitor: kubectl get applications -n argocd -w"
+	@echo "\nNext steps:"
+	@echo "  [x] apply-gitops"
+	@echo "  [x] bootstrap-platform"
+	@echo "  [ ] install-backstage    (run: make install-backstage)"
+	@echo "  [ ] validate-platform    (run: make validate-platform)"
 
 install-backstage: bootstrap-platform ## Install Backstage (via ApplicationSet, validates params first)
 	@echo "=== Waiting for Backstage Application ==="
@@ -153,8 +200,13 @@ install-backstage: bootstrap-platform ## Install Backstage (via ApplicationSet, 
 	@echo "\n=== Waiting for Backstage pods ==="
 	kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=backstage -n backstage --timeout=300s || true
 	@echo "\n✅ Backstage deployed"
-	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo "backstage.timedevops.click"); \
+	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo ""); \
 	echo "URL: https://$$BACKSTAGE_DOMAIN"
+	@echo "\nNext steps:"
+	@echo "  [x] apply-gitops"
+	@echo "  [x] bootstrap-platform"
+	@echo "  [x] install-backstage"
+	@echo "  [ ] validate-platform    (run: make validate-platform)"
 
 validate-platform: configure-kubectl ## Validate platform applications deployment
 	@echo "=== Checking Platform ApplicationSet ==="
@@ -165,9 +217,14 @@ validate-platform: configure-kubectl ## Validate platform applications deploymen
 	kubectl get pods -n backstage || echo "Backstage not deployed yet"
 	kubectl get ingress -n backstage || echo "Backstage ingress not created yet"
 	@echo "\n=== Checking DNS ==="
-	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo "backstage.timedevops.click"); \
+	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo ""); \
 	echo "Testing DNS for: $$BACKSTAGE_DOMAIN"; \
 	dig +short $$BACKSTAGE_DOMAIN
+	@echo "\nNext steps:"
+	@echo "  [x] apply-gitops"
+	@echo "  [x] bootstrap-platform"
+	@echo "  [x] install-backstage"
+	@echo "  [x] validate-platform"
 
 get-credentials: ## Show all login credentials
 	@echo "=== ArgoCD Admin ==="
@@ -175,7 +232,7 @@ get-credentials: ## Show all login credentials
 	@echo "\n=== ArgoCD Cognito SSO ==="
 	@cd terraform/platform-gitops && terraform output -json cognito_admin_credentials | jq -r 2>/dev/null || echo "(Run terraform apply first)"
 	@echo "\n=== Backstage ==="
-	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo "backstage.timedevops.click"); \
+	@BACKSTAGE_DOMAIN=$$(yq eval '.infrastructure.backstageDomain' config/platform-params.yaml 2>/dev/null || echo ""); \
 	echo "URL: https://$$BACKSTAGE_DOMAIN"; \
 	echo "Login: Cognito SSO (same credentials as ArgoCD)"
 
@@ -183,7 +240,8 @@ get-credentials: ## Show all login credentials
 
 install: apply-vpc apply-eks apply-addons apply-gitops configure-kubectl validate validate-gitops ## Install everything (VPC -> EKS -> Addons -> GitOps)
 	@echo "\n✅ Platform infrastructure deployed successfully"
-	@echo "\n🎯 Access ArgoCD: https://argocd.timedevops.click"
+	@DOMAIN=$$(yq eval '.infrastructure.domain' config/platform-params.yaml 2>/dev/null || echo ""); \
+	echo "\n🎯 Access ArgoCD: https://argocd.$$DOMAIN"
 	@echo "\n📝 Create admin user:"
 	@cd terraform/platform-gitops && terraform output -raw create_admin_user_command
 

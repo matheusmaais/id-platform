@@ -196,6 +196,38 @@ Branch: platform-gitops-implementation
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-27: Configuration Sources & Where to Edit ✅
+**Status:** ✅ DOCUMENTED (single source of truth, no duplication)
+
+**Rule:**  
+- **Sensitive only** in `.env`  
+- **Everything else** in `config/platform-params.yaml`  
+- **Terraform locals** read from `config/platform-params.yaml` (no hardcoded values)
+
+**Files to edit (ONLY these):**
+- `config/platform-params.yaml` (**non-sensitive**)
+  - `repository.url`
+  - `infrastructure.domain`
+  - `infrastructure.backstageDomain`
+  - `infrastructure.albGroupName`
+  - `infrastructure.clusterName`
+  - `infrastructure.awsRegion`
+  - `infrastructure.awsProfile`
+  - `infrastructure.environment`
+  - `identity.cognitoAdminEmail`
+  - `tags.*`
+- `.env` (**sensitive only**)
+  - `GITHUB_TOKEN`
+  - `COGNITO_ADMIN_TEMP_PASSWORD`
+
+**What NOT to edit manually:**
+- `terraform/platform-gitops/locals.tf` (reads config file)
+- `terraform/platform-gitops/*.tf` values (derived from locals)
+- Makefile variables (reads config/.env)
+
+**Why:**  
+Avoid duplicated values across `.env`, `locals`, and Terraform code.
+
 ### 2026-01-26: GitOps Apply ✅
 **Status:** ✅ DEPLOYED (kubectl wait needs local kubeconfig)
 
@@ -607,3 +639,41 @@ aws elbv2 describe-target-health --target-group-arn <tg-arn>  # healthy
 - ✅ External-DNS creating Route53 records
 - ✅ All pods healthy
 - ⚠️ `platform-apps` Application shows "Unknown" sync status (expected - no manifests in argocd-apps/platform/ yet)
+
+---
+
+### Phase: ArgoCD + Backstage (INCIDENT RESOLVED)
+Status: COMPLETE
+
+Root Cause:
+1) **ArgoCD 504** — ALB targets unhealthy because AWS LB Controller could not assume its IRSA role. The controller pods still had a **stale `AWS_ROLE_ARN`** from a previous role name, so `sts:AssumeRoleWithWebIdentity` failed and TargetGroupBinding reconciliation stalled.
+2) **Backstage OutOfSync** — Helm schema validation failed because `ingress` was defined under `backstage:` in `platform-apps/backstage/values.yaml`, which the chart rejects.
+
+Fix:
+- **IRSA rollout protection:** Added `podAnnotations` in `terraform/platform-gitops/aws-lb-controller.tf` tied to the role ARN to force pod rollouts when the IAM role changes.
+- **Backstage values:** Moved `ingress` block to top-level in `platform-apps/backstage/values.yaml` (chart expects `ingress` at root).
+
+How to Debug (Future):
+```bash
+# 1) Identify 504 source
+kubectl get ingress -n argocd
+kubectl describe ingress argocd-server -n argocd
+curl -I https://argocd.timedevops.click
+
+# 2) ALB Target health
+aws elbv2 describe-target-health --target-group-arn <tg-arn> --profile darede --region us-east-1
+
+# 3) AWS LB Controller IRSA
+kubectl get sa -n kube-system aws-load-balancer-controller -o yaml
+kubectl get pod -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller -o jsonpath='{.items[0].spec.containers[0].env}'
+kubectl logs -n kube-system deploy/aws-load-balancer-controller --tail=200
+
+# 4) Backstage Application status
+kubectl describe application backstage -n argocd
+```
+
+Validation:
+- ✅ ALB target health now shows healthy targets
+- ✅ ArgoCD UI responds HTTP 200
+- ✅ Only 1 ALB (IngressGroup `dev-platform`)
+- ⏳ Backstage sync completes after values.yaml commit to GitOps repo

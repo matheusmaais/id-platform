@@ -519,6 +519,55 @@ Add to `argocd-apps/platform/`:
 - Policy enforcement (Kyverno/OPA)
 - Cost governance
 
+## Incident: ArgoCD 504 + Backstage OutOfSync
+
+### Symptoms
+- ArgoCD UI returning HTTP 504 (ALB timeout)
+- Backstage Application stuck with `OutOfSync` / `ComparisonError`
+- No Backstage pods/ingress created
+
+### Root Cause
+1. **ALB controller IRSA drift**
+   - `aws-load-balancer-controller` pods were running with **stale** `AWS_ROLE_ARN` (`idp-poc-darede-cluster-aws-lb-controller`)
+   - The role was replaced during Terraform apply, but pods were **not restarted**
+   - Controller failed to assume role (`sts:AssumeRoleWithWebIdentity` → AccessDenied), so it could not reconcile TargetGroupBinding
+   - ALB target group health checks timed out → **HTTP 504**
+2. **Backstage Helm values schema mismatch**
+   - `ingress` block was under `backstage:` in `values.yaml`
+   - Chart schema rejects it (`Additional property ingress is not allowed`)
+   - Manifest generation failed, so ArgoCD could not sync
+
+### Fix Applied
+- **IRSA rollout protection**
+  - Added `podAnnotations` on AWS LB Controller Helm release tied to the role ARN
+  - Forces rollout whenever the role ARN changes, preventing stale web identity tokens
+- **Backstage values corrected**
+  - Moved `ingress` block to top-level (chart expects `ingress` at root)
+
+### Validation Commands
+```bash
+# 1) ALB target health
+aws elbv2 describe-target-health --target-group-arn <tg-arn> --profile darede --region us-east-1
+
+# 2) ArgoCD UI (should be 200)
+curl -I https://argocd.timedevops.click
+
+# 3) Backstage application status
+kubectl get application backstage -n argocd
+
+# 4) Backstage workload and ingress
+kubectl get pods -n backstage
+kubectl get ingress -n backstage
+
+# 5) Only one ALB (shared group.name)
+kubectl get ingress -A
+```
+
+### Lessons Learned
+- Always force rollout when IRSA role changes to avoid stale `AWS_ROLE_ARN`
+- Keep Helm values aligned with chart schema to avoid ArgoCD `ComparisonError`
+- ALB 504 often indicates TargetGroupBinding/health check reconciliation failure
+
 ## References
 
 ### Official Documentation

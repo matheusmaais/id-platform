@@ -51,6 +51,12 @@ spec:
                 value: '{{.infrastructure.backstageDomain}}'
               - name: global.albGroupName
                 value: '{{.infrastructure.albGroupName}}'
+              # Ingress host must be set explicitly
+              - name: ingress.host
+                value: '{{.infrastructure.backstageDomain}}'
+              # External DNS annotation for Route53 record
+              - name: ingress.annotations.external-dns\.alpha\.kubernetes\.io/hostname
+                value: '{{.infrastructure.backstageDomain}}'
         
         # Values from our Git repo
         - repoURL: '{{.repository.url}}'

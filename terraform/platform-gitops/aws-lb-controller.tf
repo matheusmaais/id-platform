@@ -28,13 +28,13 @@ data "aws_iam_policy_document" "aws_lb_controller_assume_role" {
 }
 
 resource "aws_iam_role" "aws_lb_controller" {
-  name               = "${var.cluster_name}-aws-lb-controller"
+  name               = "${local.cluster_name}-aws-lb-controller"
   assume_role_policy = data.aws_iam_policy_document.aws_lb_controller_assume_role.json
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${var.cluster_name}-aws-lb-controller"
+      Name = "${local.cluster_name}-aws-lb-controller"
     }
   )
 }
@@ -42,7 +42,7 @@ resource "aws_iam_role" "aws_lb_controller" {
 # AWS Load Balancer Controller IAM Policy
 # Using inline policy with full permissions for LB Controller v2.11+
 resource "aws_iam_role_policy" "aws_lb_controller" {
-  name = "${var.cluster_name}-aws-lb-controller-policy"
+  name = "${local.cluster_name}-aws-lb-controller-policy"
   role = aws_iam_role.aws_lb_controller.id
 
   policy = jsonencode({
@@ -315,6 +315,11 @@ resource "helm_release" "aws_lb_controller" {
         annotations = {
           "eks.amazonaws.com/role-arn" = aws_iam_role.aws_lb_controller.arn
         }
+      }
+
+      # Force pod rollout when IRSA role changes
+      podAnnotations = {
+        "platform.darede.io/irsa-role-arn" = aws_iam_role.aws_lb_controller.arn
       }
 
       # Resources

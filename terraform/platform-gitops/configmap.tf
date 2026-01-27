@@ -16,15 +16,15 @@ resource "kubernetes_config_map" "platform_params" {
 
   data = {
     # Domain configuration
-    DOMAIN            = local.domain
-    ARGOCD_DOMAIN     = local.subdomains.argocd
-    BACKSTAGE_DOMAIN  = local.subdomains.backstage
-    GRAFANA_DOMAIN    = local.subdomains.grafana
+    DOMAIN           = local.domain
+    ARGOCD_DOMAIN    = local.subdomains.argocd
+    BACKSTAGE_DOMAIN = local.subdomains.backstage
+    GRAFANA_DOMAIN   = local.subdomains.grafana
 
     # AWS configuration
     AWS_REGION     = data.aws_region.current.name
     AWS_ACCOUNT_ID = data.aws_caller_identity.current.account_id
-    CLUSTER_NAME   = var.cluster_name
+    CLUSTER_NAME   = local.cluster_name
 
     # Cognito configuration
     COGNITO_ISSUER        = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${aws_cognito_user_pool.main.id}"
@@ -44,6 +44,24 @@ resource "kubernetes_config_map" "platform_params" {
 
   depends_on = [
     helm_release.argocd
+  ]
+}
+
+# Copy platform-params to backstage namespace for app consumption
+resource "kubernetes_config_map" "platform_params_backstage" {
+  metadata {
+    name      = "platform-params"
+    namespace = "backstage"
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+      "app.kubernetes.io/part-of"    = "platform-gitops"
+    }
+  }
+
+  data = kubernetes_config_map.platform_params.data
+
+  depends_on = [
+    kubernetes_namespace.backstage
   ]
 }
 

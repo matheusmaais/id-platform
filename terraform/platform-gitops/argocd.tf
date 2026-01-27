@@ -42,10 +42,10 @@ resource "helm_release" "argocd" {
                   # Claim mappings
                   # Cognito doesn't return "name" claim, so we use email as username
                   userNameKey = "email"
-                  
+
                   # Don't require email_verified claim (Cognito may not always return it)
                   insecureSkipEmailVerified = true
-                  
+
                   claimMapping = {
                     groups = "cognito:groups"
                   }
@@ -67,9 +67,14 @@ resource "helm_release" "argocd" {
         # RBAC Configuration
         rbac = {
           # RBAC policy
+          # Note: Cognito returns groups as JSON array string via Lambda trigger
+          # The claim is mapped to "cognito:groups" -> "groups" in Dex
           "policy.csv" = <<-EOT
-            # ArgoCD Admins group gets admin role
+            # ArgoCD Admins group gets admin role (Cognito group name)
             g, ${local.cognito.admin_group_name}, role:admin
+            
+            # Fallback: Admin email gets admin role (in case group mapping fails)
+            g, ${local.cognito_admin_email}, role:admin
             
             # Additional custom policies can be added here
           EOT
@@ -77,20 +82,20 @@ resource "helm_release" "argocd" {
           # Default policy for authenticated users
           "policy.default" = "role:readonly"
 
-          # Scopes for RBAC
+          # Scopes for RBAC - must include groups
           scopes = "[groups, email]"
         }
 
         # Parameters
         params = {
           # Server configuration
-          "server.insecure"                    = "true" # TLS terminated at ALB
-          "server.basehref"                    = "/"
-          "server.rootpath"                    = ""
-          "server.disable.auth"                = "false"
-          "server.enable.gzip"                 = "true"
-          "server.x.frame.options"             = "sameorigin"
-          "application.namespaces"             = local.argocd.namespace
+          "server.insecure"                                   = "true" # TLS terminated at ALB
+          "server.basehref"                                   = "/"
+          "server.rootpath"                                   = ""
+          "server.disable.auth"                               = "false"
+          "server.enable.gzip"                                = "true"
+          "server.x.frame.options"                            = "sameorigin"
+          "application.namespaces"                            = local.argocd.namespace
           "applicationsetcontroller.enable.progressive.syncs" = "true"
         }
       }
@@ -114,9 +119,9 @@ resource "helm_release" "argocd" {
 
         # Autoscaling
         autoscaling = {
-          enabled     = true
-          minReplicas = 2
-          maxReplicas = 5
+          enabled                           = true
+          minReplicas                       = 2
+          maxReplicas                       = 5
           targetCPUUtilizationPercentage    = 80
           targetMemoryUtilizationPercentage = 80
         }
@@ -126,9 +131,9 @@ resource "helm_release" "argocd" {
           enabled = true
           annotations = {
             # ALB IngressGroup - shares ALB with other platform apps
-            "kubernetes.io/ingress.class"                    = "alb"
-            "alb.ingress.kubernetes.io/group.name"           = local.shared_alb.group_name
-            "alb.ingress.kubernetes.io/group.order"          = "100"
+            "kubernetes.io/ingress.class"           = "alb"
+            "alb.ingress.kubernetes.io/group.name"  = local.shared_alb.group_name
+            "alb.ingress.kubernetes.io/group.order" = "100"
 
             # ALB configuration
             "alb.ingress.kubernetes.io/scheme"               = "internet-facing"
@@ -201,9 +206,9 @@ resource "helm_release" "argocd" {
         replicas = 2
 
         autoscaling = {
-          enabled     = true
-          minReplicas = 2
-          maxReplicas = 5
+          enabled                           = true
+          minReplicas                       = 2
+          maxReplicas                       = 5
           targetCPUUtilizationPercentage    = 80
           targetMemoryUtilizationPercentage = 80
         }

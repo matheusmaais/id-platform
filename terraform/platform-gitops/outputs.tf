@@ -92,8 +92,8 @@ output "external_dns_role_arn" {
 output "argocd_admin_credentials" {
   description = "ArgoCD Admin Credentials"
   value = {
-    url      = "https://${local.subdomains.argocd}"
-    username = "admin"
+    url              = "https://${local.subdomains.argocd}"
+    username         = "admin"
     password_command = "kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d"
   }
 }
@@ -103,8 +103,8 @@ output "cognito_admin_credentials" {
   value = {
     url                = "https://${local.subdomains.argocd}"
     login_method       = "LOG IN VIA COGNITO"
-    email              = var.cognito_admin_email
-    temporary_password = var.cognito_admin_temp_password
+    email              = local.cognito_admin_email
+    temporary_password = local.cognito_admin_temp_password
     note               = "Password must be changed on first login"
   }
   sensitive = true
