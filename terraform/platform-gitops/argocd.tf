@@ -40,6 +40,8 @@ resource "helm_release" "argocd" {
                   scopes = ["openid", "profile", "email"]
 
                   # Claim mappings
+                  # Cognito doesn't return "name" claim, so we use email as username
+                  userNameKey = "email"
                   claimMapping = {
                     groups = "cognito:groups"
                   }
