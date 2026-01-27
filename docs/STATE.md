@@ -141,54 +141,84 @@ Branch: main
 - **Health**: Pod running 1/1, HTTP 200 responses
 - **Ingress**: Using shared ALB (dev-platform IngressGroup)
 
-### 🚧 BLOCKED - REQUIRES DECISION
+### 🚧 BLOCKED - TECHNICAL LIMITATION
 
-#### Backstage OIDC Authentication
-- **Status**: ❌ BLOCKED - Cannot enable OIDC without custom image
-- **Root Cause**: Official Backstage image (`ghcr.io/backstage/backstage:latest`) does NOT include auth provider plugins
+#### Backstage OIDC Authentication  
+- **Status**: ❌ BLOCKED - Incompatible package versions
+- **Root Cause #1**: Official Backstage image does NOT include auth provider plugins (RESOLVED - built custom image)
+- **Root Cause #2**: Package version incompatibility - `@backstage/backend-defaults@0.6.0` does NOT provide required core services
 - **Technical Details**:
-  - Backstage OIDC requires `@backstage/plugin-auth-backend-module-oidc-provider` installed in the application
-  - This is a Node.js dependency that must be added to `package.json` and built into the image
-  - Cannot be added via configuration alone
-  - No official public image with OIDC support exists
+  - Custom image built successfully with OIDC plugin
+  - Image: `948881762705.dkr.ecr.us-east-1.amazonaws.com/backstage-platform:20260127-160113`
+  - Platform: ARM64 (matches t4g nodes)
+  - **BLOCKER**: Catalog plugin requires `core.permissionsRegistry` and `core.auditor` services
+  - These services are NOT provided by `@backstage/backend-defaults@^0.6.0`
+  - Upgrading to newer versions causes other package incompatibilities
+  - Error: `Service or extension point dependencies of plugin 'catalog' are missing`
 
-**OPTIONS:**
+**ATTEMPTS MADE:**
+1. ✅ Built custom image with OIDC plugin
+2. ✅ Fixed ARM64 architecture (exec format error)
+3. ✅ Added entrypoint script for bundle extraction
+4. ✅ Configured Helm command override
+5. ❌ **BLOCKED**: Package version incompatibility
 
-**A) Build Custom Backstage Image (RECOMMENDED)**
+**TECHNICAL BLOCKER:**
+```
+Error: Service or extension point dependencies of plugin 'catalog' are missing  
+Missing: serviceRef{core.permissionsRegistry}, serviceRef{core.auditor}
+
+Root Cause:
+- @backstage/backend-defaults@0.6.0 does NOT provide these core services
+- Newer versions (0.7.x+) provide them BUT cause other package conflicts
+- Backstage ecosystem has breaking changes between minor versions
+- No stable version set that works with all plugins
+```
+
+**RESOLUTION OPTIONS:**
+
+**A) Use Backstage without Catalog (Auth Only)**
 ```
 Pros:
-- Full OIDC support with Cognito
-- Maintains project goal (SSO everywhere)
-- Standard Backstage practice (everyone does this)
+- OIDC authentication works
+- Meets SSO requirement
+- Simpler backend
 
 Cons:
-- Requires Dockerfile + CI/CD for image builds
-- Adds complexity to deployment
+- No software catalog
+- Limited Backstage functionality
 ```
 
-**B) Use Guest Mode Temporarily**
+**B) Use Latest Backstage Versions (All Latest)**
 ```
 Pros:
-- Unblocks Phase 0 completion
-- Can add OIDC in Phase 1
+- All features work
+- Modern architecture
 
 Cons:
-- No authentication (security risk)
-- Doesn't meet Phase 0 success criteria
+- Requires updating ALL packages to latest
+- May introduce other incompatibilities
+- Longer build/test cycle
 ```
 
-**C) Skip Backstage for Phase 0**
+**C) Defer Backstage to Phase 1**
 ```
 Pros:
-- Focus on ArgoCD OIDC (already working)
-- Add Backstage in Phase 1 with proper setup
+- ArgoCD OIDC already working ✅
+- Can focus on infrastructure provisioning
+- Revisit Backstage with stable versions
 
 Cons:
-- Incomplete Phase 0
-- Delays IDP functionality
+- Phase 0 incomplete
+- No IDP UI for now
 ```
 
-**DECISION REQUIRED:** Which option should we proceed with?
+**RECOMMENDATION:** Option C - Defer Backstage to Phase 1
+- ArgoCD provides GitOps UI with OIDC ✅
+- Can proceed with Crossplane (infra provisioning)
+- Backstage can be added later with stable versions
+
+**DECISION REQUIRED:** Which option to proceed?
 
 ### 🚧 IN PROGRESS
 
