@@ -199,6 +199,139 @@ All platform apps in same environment share the same ALB.
 
 ---
 
+---
+
+## ADR-005: Bootstrap vs Platform Deployment Strategy
+
+### Status
+**ACCEPTED** - 2026-01-27
+
+### Context
+After completing infrastructure bootstrap (VPC, EKS, ArgoCD), we need a clear strategy for deploying platform applications (Backstage, Crossplane, etc.). The key decision is: **How do we transition from Terraform-managed infrastructure to GitOps-managed applications?**
+
+### Decision
+**Two-Phase Approach:**
+
+#### Phase 0: Bootstrap (Terraform + Makefile)
+- **What**: Core infrastructure that enables GitOps
+- **Tools**: Terraform, AWS CLI, kubectl (via Makefile)
+- **Scope**:
+  - VPC, EKS Cluster, Karpenter
+  - ArgoCD (the GitOps engine itself)
+  - AWS Load Balancer Controller
+  - External-DNS
+  - Cognito User Pool
+- **Deployment**: `make install`, `make install-gitops`
+- **Why Terraform**: These are foundational AWS resources that ArgoCD depends on
+
+#### Phase 1+: Platform Applications (GitOps)
+- **What**: All applications and platform services
+- **Tools**: ArgoCD, Helm, Kustomize
+- **Scope**:
+  - Backstage
+  - Crossplane
+  - Observability stack (Prometheus, Grafana, Loki)
+  - Security tools (Falco, OPA)
+  - Any developer-facing services
+- **Deployment**: ArgoCD ApplicationSets + Git commits
+- **Why GitOps**: Self-healing, auditable, no `terraform apply` needed
+
+### Key Principles
+
+1. **"No More Terraform After Bootstrap"**
+   - After `make install-gitops` completes, all changes go through Git → ArgoCD
+   - Terraform is only for infrastructure that ArgoCD cannot manage (VPC, EKS control plane)
+
+2. **Dependency Management via Sync Waves**
+   ```yaml
+   # Backstage first
+   annotations:
+     argocd.argoproj.io/sync-wave: "0"
+   
+   # Crossplane after Backstage
+   annotations:
+     argocd.argoproj.io/sync-wave: "10"
+   
+   # Templates after Crossplane
+   annotations:
+     argocd.argoproj.io/sync-wave: "20"
+   ```
+
+3. **Makefile as User Interface**
+   ```bash
+   # Bootstrap (once)
+   make install
+   make install-gitops
+   
+   # Platform (triggers GitOps)
+   make install-backstage    # Creates ArgoCD Application
+   make install-crossplane   # Creates ArgoCD Application
+   
+   # After this, everything is Git-driven
+   ```
+
+### Repository Structure
+
+```
+id-platform/
+├── terraform/               # Phase 0 only
+│   ├── vpc/
+│   ├── eks/
+│   └── platform-gitops/    # ArgoCD + LB Controller + DNS
+│
+├── argocd-apps/            # ArgoCD Application definitions
+│   ├── bootstrap/
+│   │   └── argocd.yaml    # ArgoCD managing itself
+│   └── platform/
+│       ├── backstage.yaml      # NEW
+│       ├── crossplane.yaml     # NEW
+│       └── observability.yaml  # Future
+│
+└── platform-apps/          # Application configurations
+    ├── backstage/
+    │   ├── values-dev.yaml
+    │   ├── values-prod.yaml
+    │   └── templates/
+    └── crossplane/
+        └── providers/
+```
+
+### Benefits
+
+1. **Clear Separation**
+   - Infrastructure = Terraform
+   - Applications = GitOps
+   - No confusion about which tool manages what
+
+2. **GitOps Benefits for Apps**
+   - Declarative: Desired state in Git
+   - Auditable: Git history = deployment history
+   - Self-healing: ArgoCD auto-syncs
+   - No manual `kubectl apply`
+
+3. **Reduced Terraform Scope**
+   - Faster plan/apply cycles
+   - Less state lock contention
+   - Easier to reason about
+
+4. **User-Friendly**
+   ```bash
+   # Simple mental model
+   make install-gitops    # Once (Terraform)
+   make install-backstage # Once (creates ArgoCD app)
+   git commit             # Always (changes apps)
+   ```
+
+### Consequences
+
+- ✅ Platform team only needs Git access for most changes
+- ✅ ArgoCD provides UI for deployment visibility
+- ✅ Applications can self-update via ApplicationSets
+- ⚠️ Bootstrap changes still require Terraform knowledge
+- ⚠️ ArgoCD itself is a SPOF (but manageable)
+
+---
+
 ## Summary: Target Architecture
 
 ```
