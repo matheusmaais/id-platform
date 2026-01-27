@@ -26,6 +26,8 @@ backstage:
     app:
       title: Internal Developer Platform
       baseUrl: https://${BACKSTAGE_DOMAIN}
+      # Sign-in configuration - force OIDC login, disable guest
+      signInPage: oidc
 
     backend:
       baseUrl: https://${BACKSTAGE_DOMAIN}
@@ -54,9 +56,6 @@ backstage:
             signIn:
               resolvers:
                 - resolver: emailMatchingUserEntityProfileEmail
-    
-    # Sign-in configuration - force OIDC login
-    signInPage: oidc
 
     # Catalog configuration
     catalog:
