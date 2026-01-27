@@ -25,10 +25,10 @@ backstage:
   appConfig:
     app:
       title: Internal Developer Platform
-      baseUrl: ${BACKSTAGE_DOMAIN:+https://${BACKSTAGE_DOMAIN}}
+      baseUrl: https://${BACKSTAGE_DOMAIN}
 
     backend:
-      baseUrl: ${BACKSTAGE_DOMAIN:+https://${BACKSTAGE_DOMAIN}}
+      baseUrl: https://${BACKSTAGE_DOMAIN}
       listen:
         port: 7007
         host: 0.0.0.0
