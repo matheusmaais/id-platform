@@ -2,7 +2,13 @@
 # Backstage Helm Values
 # Uses platform-params ConfigMap for infrastructure values
 # Repository/branch already handled by ApplicationSet
+# Domain values are injected by ApplicationSet via Helm parameters
 ################################################################################
+
+# Global values (injected by ApplicationSet)
+global:
+  domain: ""  # Will be set by ApplicationSet from ConfigMap
+  albGroupName: ""  # Will be set by ApplicationSet from ConfigMap
 
 backstage:
   replicas: 2
@@ -105,10 +111,10 @@ backstage:
     enabled: true
     className: alb
     annotations:
-      # ALB configuration (uses ConfigMap values)
+      # ALB configuration (uses values from ApplicationSet)
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/group.name: dev-platform
+      alb.ingress.kubernetes.io/group.name: "{{ .Values.global.albGroupName }}"
       alb.ingress.kubernetes.io/group.order: "200"
       alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
       alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
@@ -120,11 +126,11 @@ backstage:
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
       alb.ingress.kubernetes.io/ssl-redirect: "443"
       
-      # External DNS
-      external-dns.alpha.kubernetes.io/hostname: backstage.timedevops.click
+      # External DNS (uses domain from ApplicationSet)
+      external-dns.alpha.kubernetes.io/hostname: "{{ .Values.global.domain }}"
     
     hosts:
-      - host: backstage.timedevops.click
+      - host: "{{ .Values.global.domain }}"
         paths:
           - path: /
             pathType: Prefix

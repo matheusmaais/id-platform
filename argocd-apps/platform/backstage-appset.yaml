@@ -45,6 +45,12 @@ spec:
             valueFiles:
               # CRITICAL: Dynamic valueFiles path
               - $values/platform-apps/backstage/values.yaml
+            # Override values with parameters from config
+            parameters:
+              - name: global.domain
+                value: '{{.infrastructure.backstageDomain}}'
+              - name: global.albGroupName
+                value: '{{.infrastructure.albGroupName}}'
         
         # Values from our Git repo
         - repoURL: '{{.repository.url}}'

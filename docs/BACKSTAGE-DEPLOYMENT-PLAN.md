@@ -22,29 +22,42 @@ All repository, organization, and chart version references are **dynamically par
 ### Why This Matters
 
 ```yaml
-# ❌ Before (hardcoded)
+# ❌ Before (hardcoded in multiple places)
 valueFiles:
   - https://raw.githubusercontent.com/matheusmaais/id-platform/main/platform-apps/backstage/values.yaml
+annotations:
+  external-dns.alpha.kubernetes.io/hostname: backstage.timedevops.click
+hosts:
+  - host: backstage.timedevops.click
 
-# ✅ After (dynamic)
+# ✅ After (fully dynamic)
 valueFiles:
   - $values/platform-apps/backstage/values.yaml
-# ApplicationSet resolves {{.repository.url}} and {{.repository.branch}} from config/platform-params.yaml
+parameters:
+  - name: global.domain
+    value: '{{.infrastructure.backstageDomain}}'
+# Ingress uses: {{ .Values.global.domain }}
 ```
 
 **Fork/Migration Process:**
 1. Fork repository
-2. Edit `config/platform-params.yaml` (1 file)
+2. Edit `config/platform-params.yaml` (1 file):
+   - Update `repository.org` and `repository.name`
+   - Update `infrastructure.domain` and `infrastructure.backstageDomain`
+   - Update `infrastructure.albGroupName`
 3. Commit + push
-4. ✅ Everything updates automatically via GitOps
+4. ✅ Everything updates automatically via GitOps (including Ingress hostnames)
 
 ### Configuration Layers
 
 | Layer | Managed By | Examples | Changes Via |
 |-------|-----------|----------|-------------|
-| **Infrastructure** | Terraform | domain, region, cognito_issuer, ALB | `terraform apply` |
-| **Repository** | Git | org, repo, branch, chart versions | Git commit |
-| **Applications** | ArgoCD | Deployment manifests, values | Git commit |
+| **Infrastructure** | Terraform | region, cognito_issuer, ACM cert, Route53 | `terraform apply` |
+| **Platform Config** | Git | org, repo, branch, domain, ALB group, chart versions | Git commit (1 file) |
+| **Applications** | ArgoCD | Deployment manifests, Helm values | Git commit |
+
+**IMPORTANT**: Domain and ALB group name are in **Git** (`config/platform-params.yaml`), not Terraform.  
+This allows fork/migration without touching Terraform code.
 
 ---
 

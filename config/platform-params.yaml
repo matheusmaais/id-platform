@@ -10,6 +10,12 @@ repository:
   url: https://github.com/matheusmaais/id-platform
   raw_url: https://raw.githubusercontent.com/matheusmaais/id-platform
 
+# Infrastructure parameters (must match Terraform configuration)
+infrastructure:
+  domain: timedevops.click
+  backstageDomain: backstage.timedevops.click
+  albGroupName: dev-platform
+
 charts:
   backstage:
     version: "2.6.3"  # Latest stable (verified 2026-01-27)
