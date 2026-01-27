@@ -141,6 +141,55 @@ Branch: main
 - **Health**: Pod running 1/1, HTTP 200 responses
 - **Ingress**: Using shared ALB (dev-platform IngressGroup)
 
+### 🚧 BLOCKED - REQUIRES DECISION
+
+#### Backstage OIDC Authentication
+- **Status**: ❌ BLOCKED - Cannot enable OIDC without custom image
+- **Root Cause**: Official Backstage image (`ghcr.io/backstage/backstage:latest`) does NOT include auth provider plugins
+- **Technical Details**:
+  - Backstage OIDC requires `@backstage/plugin-auth-backend-module-oidc-provider` installed in the application
+  - This is a Node.js dependency that must be added to `package.json` and built into the image
+  - Cannot be added via configuration alone
+  - No official public image with OIDC support exists
+
+**OPTIONS:**
+
+**A) Build Custom Backstage Image (RECOMMENDED)**
+```
+Pros:
+- Full OIDC support with Cognito
+- Maintains project goal (SSO everywhere)
+- Standard Backstage practice (everyone does this)
+
+Cons:
+- Requires Dockerfile + CI/CD for image builds
+- Adds complexity to deployment
+```
+
+**B) Use Guest Mode Temporarily**
+```
+Pros:
+- Unblocks Phase 0 completion
+- Can add OIDC in Phase 1
+
+Cons:
+- No authentication (security risk)
+- Doesn't meet Phase 0 success criteria
+```
+
+**C) Skip Backstage for Phase 0**
+```
+Pros:
+- Focus on ArgoCD OIDC (already working)
+- Add Backstage in Phase 1 with proper setup
+
+Cons:
+- Incomplete Phase 0
+- Delays IDP functionality
+```
+
+**DECISION REQUIRED:** Which option should we proceed with?
+
 ### 🚧 IN PROGRESS
 
 #### 7. EBS CSI Driver IRSA
