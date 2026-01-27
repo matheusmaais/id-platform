@@ -42,6 +42,10 @@ resource "helm_release" "argocd" {
                   # Claim mappings
                   # Cognito doesn't return "name" claim, so we use email as username
                   userNameKey = "email"
+                  
+                  # Don't require email_verified claim (Cognito may not always return it)
+                  insecureSkipEmailVerified = true
+                  
                   claimMapping = {
                     groups = "cognito:groups"
                   }
