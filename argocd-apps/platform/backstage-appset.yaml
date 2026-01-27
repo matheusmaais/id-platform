@@ -86,3 +86,8 @@ spec:
           kind: Deployment
           jsonPointers:
             - /spec/replicas
+        # Ignore PostgreSQL secret data changes (Helm generates random passwords)
+        - kind: Secret
+          name: backstage-postgresql
+          jsonPointers:
+            - /data/postgres-password
