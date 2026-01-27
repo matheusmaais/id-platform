@@ -54,6 +54,9 @@ backstage:
             signIn:
               resolvers:
                 - resolver: emailMatchingUserEntityProfileEmail
+    
+    # Sign-in configuration - force OIDC login
+    signInPage: oidc
 
     # Catalog configuration
     catalog:
