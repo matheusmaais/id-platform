@@ -87,7 +87,7 @@ Includes:
 
 **Repository:** id-platform (migrated from reference-implementation-aws on 2026-01-24)
 Phase: Phase 0 — Bootstrap
-Status: 🚧 GITOPS AUTH IN PROGRESS
+Status: ✅ GITOPS AUTH COMPLETE - Ready for SSO validation
 Branch: main
 
 ---
@@ -131,26 +131,31 @@ Branch: main
 - Admin login: Working via admin password
 - SSO login: Working (user `admin@timedevops.click` authenticated successfully)
 
-### 🚧 IN PROGRESS
+### ✅ RECENTLY COMPLETED (2026-01-27)
 
 #### 6. Backstage with Cognito OIDC
-- **Status**: Deployment failing
-- **Root Cause**: Invalid app-config URL syntax
-- **Error**: `TypeError: Invalid URL` - Backstage doesn't support bash-style `${VAR:+value}` syntax
-- **Fix Required**: Simplify app-config to use standard `${VAR}` or literal values
+- **Status**: ✅ DEPLOYED & HEALTHY
+- **URL**: https://backstage.timedevops.click
+- **Fix Applied**: Changed `${BACKSTAGE_DOMAIN:+https://${BACKSTAGE_DOMAIN}}` to `https://${BACKSTAGE_DOMAIN}`
+- **Commit**: 9cd8984 - "fix(backstage): remove bash-style URL syntax"
+- **Health**: Pod running 1/1, HTTP 200 responses
+- **Ingress**: Using shared ALB (dev-platform IngressGroup)
 
-#### 7. EBS CSI Driver
-- **Status**: Controller CrashLoopBackOff
-- **Root Cause**: Missing IRSA (using node role credentials)
-- **Impact**: PostgreSQL persistence disabled (using ephemeral storage)
-- **Fix Required**: Create IRSA for EBS CSI driver
+### 🚧 IN PROGRESS
+
+#### 7. EBS CSI Driver IRSA
+- **Status**: Controller CrashLoopBackOff (using node role, lacks permissions)
+- **Root Cause**: Missing IRSA configuration
+- **Impact**: PostgreSQL using ephemeral storage (acceptable for Phase 0 dev)
+- **Fix Required**: Create IRSA for EBS CSI driver with required EC2 permissions
+- **Priority**: LOW (Phase 0 allows ephemeral storage for dev)
 
 ### 📝 Pending Tasks
 
-1. Fix Backstage app-config URL syntax
-2. Create EBS CSI Driver IRSA for persistent volumes
-3. Validate Backstage OIDC login end-to-end
-4. Update Makefile targets
+1. ✅ ~~Fix Backstage app-config URL syntax~~ (DONE)
+2. Validate Backstage OIDC login end-to-end (Cognito SSO)
+3. Create EBS CSI Driver IRSA for persistent volumes (Phase 0 optional)
+4. Test end-to-end platform flow (ArgoCD + Backstage SSO)
 
 ---
 
@@ -260,6 +265,49 @@ Branch: main
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-27: Backstage Deployment Fixed ✅
+**Status:** ✅ COMPLETE (Backstage healthy and accessible)
+
+**Problem:**
+- Backstage pod failing readiness probes with `TypeError: Invalid URL`
+- Error: `input: "${BACKSTAGE_DOMAIN:+https://backstage.timedevops.click}"`
+- Backstage doesn't support bash-style conditional syntax `${VAR:+value}`
+
+**Solution:**
+- Changed `platform-apps/backstage/values.yaml`:
+  - `baseUrl: ${BACKSTAGE_DOMAIN:+https://${BACKSTAGE_DOMAIN}}` → `baseUrl: https://${BACKSTAGE_DOMAIN}`
+  - Applied same fix to `backend.baseUrl`
+- Committed and pushed to main branch (commit 9cd8984)
+- ArgoCD auto-synced and redeployed Backstage
+
+**Validation:**
+```bash
+# Application status
+kubectl get application backstage -n argocd
+# NAME        SYNC STATUS   HEALTH STATUS
+# backstage   Synced        Healthy
+
+# Pod status
+kubectl get pods -n backstage
+# NAME                        READY   STATUS    RESTARTS   AGE
+# backstage-c6b4b58b4-bt5qg   1/1     Running   0          5m
+
+# HTTP check
+curl -I https://backstage.timedevops.click
+# HTTP/2 200
+```
+
+**Result:**
+- ✅ Backstage accessible at https://backstage.timedevops.click
+- ✅ Pod healthy (1/1 Running)
+- ✅ Readiness probes passing
+- ✅ Using shared ALB (dev-platform IngressGroup)
+- ✅ PostgreSQL running (ephemeral storage, acceptable for Phase 0)
+
+**Next:** Validate Cognito SSO login for both ArgoCD and Backstage
+
+---
+
 ### 2026-01-27: Configuration Sources & Where to Edit ✅
 **Status:** ✅ DOCUMENTED (single source of truth, no duplication)
 
@@ -309,7 +357,7 @@ Avoid duplicated values across `.env`, `locals`, and Terraform code.
   - `lookup ...eks.amazonaws.com: no such host`
 
 **Fix:**
-- `aws eks update-kubeconfig --region us-east-1 --name platform-eks --profile darede`
+- `aws eks update-kubeconfig --region us-east-1 --name platform-eks`
 - Then: `make validate-gitops`
 
 ### 2026-01-26: GitOps Apply Fix (Cognito MFA) ✅
@@ -323,10 +371,10 @@ Avoid duplicated values across `.env`, `locals`, and Terraform code.
   - `software_token_mfa_configuration { enabled = true }`
 
 **Next Command:**
-- `AWS_PROFILE=darede make apply-gitops`
+- `make apply-gitops` (or `AWS_PROFILE=your-profile make apply-gitops`)
 
 ### 2026-01-23: GitOps Plan Fixes + Provider Upgrade ✅
-**Status:** ✅ PLAN OK (with `AWS_PROFILE=darede`)
+**Status:** ✅ PLAN OK
 
 **What Changed:**
 - Upgraded Terraform providers via `terraform init -upgrade` (lockfile updated)
@@ -336,8 +384,8 @@ Avoid duplicated values across `.env`, `locals`, and Terraform code.
 - ACM lookup now matches primary domain `timedevops.click` (SAN includes wildcard)
 
 **Commands:**
-- Init/upgrade: `cd terraform/platform-gitops && terraform init -upgrade -reconfigure -backend-config="profile=darede"`
-- Plan: `AWS_PROFILE=darede terraform plan`
+- Init/upgrade: `cd terraform/platform-gitops && terraform init -upgrade -reconfigure`
+- Plan: `terraform plan`
 
 ### 2026-01-24: Phase 0 GitOps Implementation ✅
 **Status:** ✅ CODE COMPLETE (awaiting deployment)
@@ -725,7 +773,7 @@ kubectl describe ingress argocd-server -n argocd
 curl -I https://argocd.timedevops.click
 
 # 2) ALB Target health
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --profile darede --region us-east-1
+aws elbv2 describe-target-health --target-group-arn <tg-arn> --region us-east-1
 
 # 3) AWS LB Controller IRSA
 kubectl get sa -n kube-system aws-load-balancer-controller -o yaml
