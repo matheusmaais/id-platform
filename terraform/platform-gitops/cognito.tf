@@ -134,6 +134,59 @@ resource "aws_cognito_user_pool_client" "argocd" {
 }
 
 ################################################################################
+# Cognito User Pool Client - Backstage
+################################################################################
+
+resource "aws_cognito_user_pool_client" "backstage" {
+  name         = "backstage"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  # OAuth configuration
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "profile", "email"]
+
+  # Callback URLs
+  callback_urls = [
+    "https://${local.subdomains.backstage}/api/auth/oidc/handler/frame",
+    "http://localhost:7007/api/auth/oidc/handler/frame" # For local testing
+  ]
+
+  # Logout URLs
+  logout_urls = [
+    "https://${local.subdomains.backstage}",
+    "http://localhost:7007"
+  ]
+
+  # Supported identity providers
+  supported_identity_providers = ["COGNITO"]
+
+  # Token validity
+  id_token_validity      = 60  # 1 hour
+  access_token_validity  = 60  # 1 hour
+  refresh_token_validity = 30  # 30 days
+
+  token_validity_units {
+    id_token      = "minutes"
+    access_token  = "minutes"
+    refresh_token = "days"
+  }
+
+  # Prevent secret rotation breaking deployments
+  generate_secret = true
+
+  # Read/write attributes
+  read_attributes  = ["email", "email_verified", "preferred_username"]
+  write_attributes = ["email", "preferred_username"]
+
+  # Explicit auth flows
+  explicit_auth_flows = [
+    "ALLOW_USER_SRP_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH"
+  ]
+}
+
+################################################################################
 # Cognito User Pool Group - ArgoCD Admins
 ################################################################################
 

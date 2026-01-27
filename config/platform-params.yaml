@@ -1,0 +1,19 @@
+# Platform-wide parameters for ArgoCD ApplicationSet
+# Single-environment internal development platform
+# Change these values when forking or migrating to different org/repo
+
+repository:
+  org: matheusmaais
+  name: id-platform
+  branch: main
+  # Computed fields for convenience
+  url: https://github.com/matheusmaais/id-platform
+  raw_url: https://raw.githubusercontent.com/matheusmaais/id-platform
+
+charts:
+  backstage:
+    version: "2.6.3"  # Latest stable (verified 2026-01-27)
+    repo: https://backstage.github.io/charts
+  crossplane:
+    version: "2.1.3"  # Latest stable (verified 2026-01-27)
+    repo: https://charts.crossplane.io/stable

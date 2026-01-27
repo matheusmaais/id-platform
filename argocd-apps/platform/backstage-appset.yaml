@@ -1,0 +1,76 @@
+################################################################################
+# Backstage ApplicationSet
+# Uses Git File Generator to read config/platform-params.yaml
+# Generates Application dynamically with parameterized values
+################################################################################
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  
+  generators:
+    # Git File Generator - reads config/platform-params.yaml
+    - git:
+        repoURL: 'https://github.com/matheusmaais/id-platform'
+        revision: 'main'
+        files:
+          - path: "config/platform-params.yaml"
+  
+  template:
+    metadata:
+      name: 'backstage'
+      namespace: argocd
+      annotations:
+        # Store git params for easy reference
+        repo_url: '{{.repository.url}}'
+        repo_branch: '{{.repository.branch}}'
+        notifications.argoproj.io/subscribe.on-sync-succeeded.slack: platform-notifications
+    
+    spec:
+      project: default
+      
+      sources:
+        # Helm chart from official repo
+        - repoURL: '{{.charts.backstage.repo}}'
+          chart: backstage
+          targetRevision: '{{.charts.backstage.version}}'
+          helm:
+            releaseName: backstage
+            valueFiles:
+              # CRITICAL: Dynamic valueFiles path
+              - $values/platform-apps/backstage/values.yaml
+        
+        # Values from our Git repo
+        - repoURL: '{{.repository.url}}'
+          targetRevision: '{{.repository.branch}}'
+          ref: values
+      
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: backstage
+      
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 3
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      
+      # Health assessment
+      ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /spec/replicas

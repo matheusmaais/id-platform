@@ -1,0 +1,161 @@
+################################################################################
+# Backstage Helm Values
+# Uses platform-params ConfigMap for infrastructure values
+# Repository/branch already handled by ApplicationSet
+################################################################################
+
+backstage:
+  replicas: 2
+  
+  # Inject ConfigMap and Secrets as environment variables
+  extraEnvVarsSecrets:
+    - backstage-cognito
+    - backstage-postgresql
+  
+  extraEnvVars:
+    - name: BACKSTAGE_DOMAIN
+      valueFrom:
+        configMapKeyRef:
+          name: platform-params
+          key: BACKSTAGE_DOMAIN
+    - name: ALB_GROUP_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: platform-params
+          key: ALB_GROUP_NAME
+    - name: ALB_SECURITY_GROUP_ID
+      valueFrom:
+        configMapKeyRef:
+          name: platform-params
+          key: ALB_SECURITY_GROUP_ID
+    - name: ACM_CERTIFICATE_ARN
+      valueFrom:
+        configMapKeyRef:
+          name: platform-params
+          key: ACM_CERTIFICATE_ARN
+    - name: COGNITO_ISSUER
+      valueFrom:
+        configMapKeyRef:
+          name: platform-params
+          key: COGNITO_ISSUER
+  
+  appConfig:
+    app:
+      title: Internal Developer Platform
+      # Uses BACKSTAGE_DOMAIN from ConfigMap
+      baseUrl: https://$(BACKSTAGE_DOMAIN)
+    
+    backend:
+      baseUrl: https://$(BACKSTAGE_DOMAIN)
+      
+      # Listen on all interfaces
+      listen:
+        port: 7007
+        host: 0.0.0.0
+      
+      # Database configuration (from Secret)
+      database:
+        client: pg
+        connection:
+          host: $(POSTGRES_HOST)
+          port: $(POSTGRES_PORT)
+          user: $(POSTGRES_USER)
+          password: $(POSTGRES_PASSWORD)
+          database: $(POSTGRES_DB)
+    
+    # Cognito SSO - values from ConfigMap and Secret
+    auth:
+      environment: development
+      providers:
+        oidc:
+          development:
+            metadataUrl: $(COGNITO_ISSUER)/.well-known/openid-configuration
+            clientId: $(COGNITO_CLIENT_ID)
+            clientSecret: $(COGNITO_CLIENT_SECRET)
+            prompt: auto
+            signIn:
+              resolvers:
+                - resolver: emailMatchingUserEntityProfileEmail
+    
+    # Integrations
+    integrations:
+      github:
+        - host: github.com
+          # TODO: Add GitHub App or Personal Access Token
+          # apps:
+          #   - appId: ${GITHUB_APP_ID}
+          #     privateKey: ${GITHUB_APP_PRIVATE_KEY}
+          #     webhookSecret: ${GITHUB_WEBHOOK_SECRET}
+          #     clientId: ${GITHUB_CLIENT_ID}
+          #     clientSecret: ${GITHUB_CLIENT_SECRET}
+    
+    # Catalog configuration
+    catalog:
+      rules:
+        - allow: [Component, System, API, Resource, Location]
+      locations:
+        # Bootstrap catalog (optional)
+        # - type: url
+        #   target: https://github.com/matheusmaais/id-platform/blob/main/catalog/all.yaml
+        - type: url
+          target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
+  
+  # Ingress with shared ALB
+  ingress:
+    enabled: true
+    className: alb
+    annotations:
+      # ALB configuration (uses ConfigMap values)
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/group.name: dev-platform
+      alb.ingress.kubernetes.io/group.order: "200"
+      alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
+      alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+      alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+      alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+      alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+      
+      # TLS configuration
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: "443"
+      
+      # External DNS
+      external-dns.alpha.kubernetes.io/hostname: backstage.timedevops.click
+    
+    hosts:
+      - host: backstage.timedevops.click
+        paths:
+          - path: /
+            pathType: Prefix
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# PostgreSQL (in-cluster for development)
+# For production, use AWS RDS
+postgresql:
+  enabled: true
+  auth:
+    username: backstage
+    password: changeme-use-sealed-secrets
+    database: backstage
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi

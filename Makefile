@@ -134,6 +134,44 @@ test-karpenter: configure-kubectl ## Test Karpenter node provisioning
 cleanup-test: configure-kubectl ## Cleanup test deployment
 	kubectl delete deployment nginx --ignore-not-found
 
+##@ Platform Applications (GitOps)
+
+bootstrap-platform: configure-kubectl ## Create platform-apps ApplicationSet
+	@echo "=== Creating Platform ApplicationSet ==="
+	kubectl apply -f argocd-apps/platform/backstage-appset.yaml
+	@echo "✅ ApplicationSet created. ArgoCD will sync automatically."
+	@echo "Monitor: kubectl get applications -n argocd -w"
+
+install-backstage: bootstrap-platform ## Install Backstage (via ApplicationSet)
+	@echo "=== Waiting for Backstage Application ==="
+	kubectl wait --for=condition=Ready application/backstage -n argocd --timeout=60s || true
+	@echo "=== Checking Backstage sync status ==="
+	kubectl get application backstage -n argocd
+	@echo "\n=== Waiting for Backstage pods ==="
+	kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=backstage -n backstage --timeout=300s || true
+	@echo "\n✅ Backstage deployed"
+	@echo "URL: https://backstage.timedevops.click"
+
+validate-platform: configure-kubectl ## Validate platform applications
+	@echo "=== Checking Platform ApplicationSet ==="
+	kubectl get applicationset -n argocd
+	@echo "\n=== Checking Platform Applications ==="
+	kubectl get applications -n argocd
+	@echo "\n=== Checking Backstage ==="
+	kubectl get pods -n backstage
+	kubectl get ingress -n backstage
+	@echo "\n=== Checking DNS ==="
+	dig +short backstage.timedevops.click
+
+get-credentials: ## Show all login credentials
+	@echo "=== ArgoCD Admin ==="
+	@cd terraform/platform-gitops && terraform output -json argocd_admin_credentials | jq -r
+	@echo "\n=== ArgoCD Cognito SSO ==="
+	@cd terraform/platform-gitops && terraform output -json cognito_admin_credentials | jq -r 2>/dev/null || echo "(Run terraform apply first)"
+	@echo "\n=== Backstage ==="
+	@echo "URL: https://backstage.timedevops.click"
+	@echo "Login: Cognito SSO (same credentials as ArgoCD)"
+
 ##@ Complete workflows
 
 install: apply-vpc apply-eks apply-addons apply-gitops configure-kubectl validate validate-gitops ## Install everything (VPC -> EKS -> Addons -> GitOps)

@@ -1,18 +1,61 @@
 # Backstage Deployment Plan
 
+**NOTA: Plataforma Single-Environment**  
+Esta é uma plataforma de desenvolvimento interno (single-environment). O foco está em facilitar fork/migração entre organizações e repositórios, não em gerenciar múltiplos ambientes (dev/staging/prod).
+
 ## 📋 Overview
 
-This document outlines the strategy for deploying Backstage as the Internal Developer Platform (IDP) following GitOps best practices with ArgoCD.
+This document outlines the strategy for deploying Backstage as the Internal Developer Platform (IDP) following GitOps best practices with ArgoCD, using dynamic parametrization via ApplicationSet + Git File Generator.
+
+---
+
+## 🔄 Parametrization Strategy
+
+### Zero Hardcoding Approach
+
+All repository, organization, and chart version references are **dynamically parameterized** using:
+
+1. **Git File (config/platform-params.yaml)**: Repository, organization, branch, and chart versions
+2. **Terraform ConfigMap (platform-params)**: Infrastructure values (domain, cognito, ALB, etc.)
+3. **ArgoCD ApplicationSet**: Reads git file, generates Applications with substituted values
+
+### Why This Matters
+
+```yaml
+# ❌ Before (hardcoded)
+valueFiles:
+  - https://raw.githubusercontent.com/matheusmaais/id-platform/main/platform-apps/backstage/values.yaml
+
+# ✅ After (dynamic)
+valueFiles:
+  - $values/platform-apps/backstage/values.yaml
+# ApplicationSet resolves {{.repository.url}} and {{.repository.branch}} from config/platform-params.yaml
+```
+
+**Fork/Migration Process:**
+1. Fork repository
+2. Edit `config/platform-params.yaml` (1 file)
+3. Commit + push
+4. ✅ Everything updates automatically via GitOps
+
+### Configuration Layers
+
+| Layer | Managed By | Examples | Changes Via |
+|-------|-----------|----------|-------------|
+| **Infrastructure** | Terraform | domain, region, cognito_issuer, ALB | `terraform apply` |
+| **Repository** | Git | org, repo, branch, chart versions | Git commit |
+| **Applications** | ArgoCD | Deployment manifests, values | Git commit |
 
 ---
 
 ## 🎯 Objectives
 
-1. **User-Friendly Installation**: Streamlined process via Makefile
-2. **GitOps Native**: All configuration in Git, managed by ArgoCD
-3. **Correct Dependencies**: Respect installation order (Backstage → Crossplane → Templates)
-4. **Best Practices**: Follow official Backstage recommendations
-5. **SSO Integration**: Cognito authentication like ArgoCD
+1. **Zero Hardcoding**: All repo/org/chart references parameterized
+2. **User-Friendly Installation**: Streamlined process via Makefile
+3. **GitOps Native**: All configuration in Git, managed by ArgoCD
+4. **Correct Dependencies**: Respect installation order (Backstage → Crossplane → Templates)
+5. **Best Practices**: Follow official Backstage recommendations with latest chart versions
+6. **SSO Integration**: Cognito authentication (shared with ArgoCD)
 
 ---
 
@@ -41,10 +84,11 @@ This document outlines the strategy for deploying Backstage as the Internal Deve
 
 ### 1. Helm Chart Strategy
 
-Use **official Backstage Helm chart**:
+Use **official Backstage Helm chart** (latest version verified):
 ```
 Repository: https://backstage.github.io/charts
 Chart: backstage
+Version: 2.6.3 (verified 2026-01-27)
 ```
 
 **Why Helm?**
@@ -52,30 +96,37 @@ Chart: backstage
 - ✅ Battle-tested defaults
 - ✅ Easy customization via values.yaml
 - ✅ ArgoCD native support
+- ✅ Version explicitly managed in `config/platform-params.yaml`
 
 ### 2. GitOps Repository Structure
 
 ```
 id-platform/
+├── config/
+│   └── platform-params.yaml    # 🆕 CENTRAL CONFIG - repo/org/charts
 ├── argocd-apps/
 │   ├── bootstrap/              # ArgoCD itself (already deployed)
 │   │   └── argocd.yaml
 │   └── platform/               # Platform applications
-│       ├── backstage.yaml      # NEW
-│       ├── crossplane.yaml     # NEW (depends on backstage)
-│       └── observability/      # Future
-│           ├── prometheus.yaml
-│           └── grafana.yaml
+│       └── backstage-appset.yaml # 🆕 ApplicationSet (reads config/)
 ├── platform-apps/              # Application configurations
 │   ├── backstage/
-│   │   ├── values-dev.yaml
-│   │   ├── values-prod.yaml
-│   │   └── app-config.yaml     # Backstage config
+│   │   └── values.yaml         # 🆕 Uses ConfigMap templating
 │   └── crossplane/
-│       ├── values.yaml
-│       └── providers/
-│           └── aws-provider.yaml
+│       └── values.yaml         # Future
+├── scripts/
+│   └── validate-params.sh      # 🆕 Validation script
+└── terraform/platform-gitops/
+    ├── configmap.tf            # 🆕 Platform ConfigMap
+    ├── secrets.tf              # 🆕 Backstage secrets
+    └── cognito.tf              # ✏️ Updated with Backstage client
 ```
+
+**Key Files:**
+- `config/platform-params.yaml`: Repository, org, branch, chart versions
+- `terraform/platform-gitops/configmap.tf`: Infrastructure values (domain, cognito, ALB)
+- `argocd-apps/platform/backstage-appset.yaml`: ApplicationSet with Git File Generator
+- `platform-apps/backstage/values.yaml`: Helm values with ConfigMap templating
 
 ### 3. ArgoCD Application Hierarchy
 

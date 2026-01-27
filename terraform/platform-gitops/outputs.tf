@@ -101,11 +101,40 @@ output "argocd_admin_credentials" {
 output "cognito_admin_credentials" {
   description = "Cognito Admin User Credentials (SSO Login)"
   value = {
-    url               = "https://${local.subdomains.argocd}"
-    login_method      = "LOG IN VIA COGNITO"
-    email             = var.cognito_admin_email
+    url                = "https://${local.subdomains.argocd}"
+    login_method       = "LOG IN VIA COGNITO"
+    email              = var.cognito_admin_email
     temporary_password = var.cognito_admin_temp_password
-    note              = "Password must be changed on first login"
+    note               = "Password must be changed on first login"
   }
   sensitive = true
+}
+
+################################################################################
+# Backstage Outputs
+################################################################################
+
+output "backstage_url" {
+  description = "Backstage URL"
+  value       = "https://${local.subdomains.backstage}"
+}
+
+output "backstage_cognito_client_id" {
+  description = "Cognito Backstage Client ID"
+  value       = aws_cognito_user_pool_client.backstage.id
+}
+
+output "backstage_cognito_client_secret" {
+  description = "Cognito Backstage Client Secret"
+  value       = aws_cognito_user_pool_client.backstage.client_secret
+  sensitive   = true
+}
+
+################################################################################
+# Platform Configuration
+################################################################################
+
+output "platform_params_configmap" {
+  description = "Platform parameters ConfigMap name"
+  value       = kubernetes_config_map.platform_params.metadata[0].name
 }
