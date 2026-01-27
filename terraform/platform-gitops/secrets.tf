@@ -76,6 +76,7 @@ resource "kubernetes_secret" "backstage_cognito" {
   data = {
     COGNITO_CLIENT_ID     = aws_cognito_user_pool_client.backstage.id
     COGNITO_CLIENT_SECRET = aws_cognito_user_pool_client.backstage.client_secret
+    COGNITO_ISSUER        = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
   }
 
   type = "Opaque"
