@@ -87,8 +87,72 @@ Includes:
 
 **Repository:** id-platform (migrated from reference-implementation-aws on 2026-01-24)
 Phase: Phase 0 — Bootstrap
-Status: ✅ INFRASTRUCTURE COMPLETE
-Branch: platform-gitops-implementation
+Status: 🚧 GITOPS AUTH IN PROGRESS
+Branch: main
+
+---
+
+## 📋 PHASE 0 GitOps Auth Foundation Status (2026-01-27)
+
+### ✅ COMPLETED
+
+#### 1. Cognito Foundation
+- User Pool: `us-east-1_75myDdDAc` (platform-eks-user-pool)
+- OAuth Domain: `idp-poc-darede`
+- ArgoCD Client: `ln4nvdorop4i2rh6isgbi1m0k`
+- Backstage Client: `oseg1vj7ai3usqafrjtpor4e7`
+- Group: `argocd-admins` created
+- Admin User: `admin@timedevops.click` (CONFIRMED) in `argocd-admins` group
+- **Pre-Token Generation Lambda**: Injects `cognito:groups` into ID token
+
+#### 2. AWS Load Balancer Controller
+- Version: v2.17.1
+- IRSA configured
+- 2 replicas running
+- Health: ✅ All targets healthy
+
+#### 3. Shared ALB (IngressGroup)
+- ALB Name: `k8s-devplatform-8c400353ac`
+- Group Name: `dev-platform`
+- Security Group: `sg-0e4f3823de6ccc51b`
+- State: Active
+
+#### 4. External-DNS
+- Version: v0.20.0
+- IRSA configured
+- Route53 zone: `Z09212782MXWNY5EYNICO`
+- Policy: `upsert-only`
+
+#### 5. ArgoCD with Cognito OIDC
+- Version: v3.2.6 (Chart 9.3.5)
+- URL: https://argocd.timedevops.click ✅ HTTP 200
+- Dex connector: Cognito OIDC ✅
+- RBAC: `g, argocd-admins, role:admin` + email fallback
+- Admin login: Working via admin password
+- SSO login: Working (user `admin@timedevops.click` authenticated successfully)
+
+### 🚧 IN PROGRESS
+
+#### 6. Backstage with Cognito OIDC
+- **Status**: Deployment failing
+- **Root Cause**: Invalid app-config URL syntax
+- **Error**: `TypeError: Invalid URL` - Backstage doesn't support bash-style `${VAR:+value}` syntax
+- **Fix Required**: Simplify app-config to use standard `${VAR}` or literal values
+
+#### 7. EBS CSI Driver
+- **Status**: Controller CrashLoopBackOff
+- **Root Cause**: Missing IRSA (using node role credentials)
+- **Impact**: PostgreSQL persistence disabled (using ephemeral storage)
+- **Fix Required**: Create IRSA for EBS CSI driver
+
+### 📝 Pending Tasks
+
+1. Fix Backstage app-config URL syntax
+2. Create EBS CSI Driver IRSA for persistent volumes
+3. Validate Backstage OIDC login end-to-end
+4. Update Makefile targets
+
+---
 
 ### Completed Components
 
