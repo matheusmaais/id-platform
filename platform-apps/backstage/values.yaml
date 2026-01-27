@@ -47,6 +47,8 @@ backstage:
     auth:
       environment: development
       providers:
+        # Disable guest provider - force OIDC authentication
+        guest: null
         oidc:
           development:
             metadataUrl: ${COGNITO_ISSUER}/.well-known/openid-configuration
