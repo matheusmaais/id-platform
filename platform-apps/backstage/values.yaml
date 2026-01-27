@@ -12,6 +12,12 @@ global:
 backstage:
   replicas: 1
 
+  # Custom image with OIDC support
+  image:
+    registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com
+    repository: backstage-platform
+    tag: "20260127-152032"
+
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:
     - platform-params

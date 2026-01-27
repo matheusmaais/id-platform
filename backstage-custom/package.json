@@ -1,0 +1,34 @@
+{
+  "name": "backstage-platform",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "20 || 22"
+  },
+  "scripts": {
+    "dev": "concurrently \"yarn start\" \"yarn start-backend\"",
+    "start": "yarn workspace app start",
+    "start-backend": "yarn workspace backend start",
+    "build:backend": "yarn workspace backend build",
+    "build:all": "backstage-cli repo build --all",
+    "tsc": "tsc"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ]
+  },
+  "devDependencies": {
+    "@backstage/cli": "^0.27.1",
+    "@spotify/prettier-config": "^15.0.0",
+    "concurrently": "^9.0.0",
+    "prettier": "^2.3.2",
+    "typescript": "~5.6.0"
+  },
+  "prettier": "@spotify/prettier-config",
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "prettier --write"
+    ]
+  }
+}
