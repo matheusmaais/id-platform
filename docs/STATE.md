@@ -511,4 +511,51 @@ karpenter-node-group   True
 - Simpler architecture preferred
 - Better integration with AWS services
 
-**Decision:** PENDING user confirmation
+**Decision:** ALB implemented (2026-01-27)
+
+---
+
+## 📝 RECENT CHANGES
+
+### 2026-01-27: GitOps Fixes - ALB Connectivity & ArgoCD
+
+**Issues Fixed:**
+1. **AWS LB Controller IAM Policy** - Missing `elasticloadbalancing:DescribeListenerAttributes` permission (new in v2.11+)
+2. **External-DNS IAM Policy** - `ListResourceRecordSets` was scoped to single zone, but external-dns discovers all zones first
+3. **ALB Security Group** - Was using cluster SG (no external ingress), created dedicated SG with HTTPS 443 from 0.0.0.0/0
+4. **ALB to Pods Connectivity** - Added SG rules to allow ALB to reach pods on port 8080 (cluster SG + node SG)
+5. **ArgoCD Redirect Loop** - Fixed by setting `server.rootpath = ""` instead of `/`
+
+**Changes Made:**
+- `terraform/platform-gitops/aws-lb-controller.tf`: Replaced managed policy with inline policy containing full v2.11+ permissions
+- `terraform/platform-gitops/external-dns.tf`: Moved `ListResourceRecordSets` to global scope (required for zone discovery)
+- `terraform/platform-gitops/argocd.tf`: 
+  - Created `aws_security_group.argocd_alb` with HTTPS ingress
+  - Added `aws_security_group_rule.argocd_alb_to_cluster` for ALB→cluster SG
+  - Fixed ArgoCD params: `server.basehref = "/"`, `server.rootpath = ""`
+
+**Manual Step Required:**
+- Added SG rule to node security group (`sg-0af4edc484e912aa3`) via AWS CLI
+- TODO: Export node SG from EKS module and manage via Terraform
+
+**Validation:**
+```bash
+# All checks pass
+make validate-gitops
+
+# ArgoCD accessible
+curl -I https://argocd.timedevops.click  # HTTP 200
+
+# DNS resolving
+dig argocd.timedevops.click +short  # Returns ALB IPs
+
+# Target health
+aws elbv2 describe-target-health --target-group-arn <tg-arn>  # healthy
+```
+
+**Current Status:**
+- ✅ ArgoCD UI accessible at https://argocd.timedevops.click
+- ✅ ALB with TLS termination (ACM certificate)
+- ✅ External-DNS creating Route53 records
+- ✅ All pods healthy
+- ⚠️ `platform-apps` Application shows "Unknown" sync status (expected - no manifests in argocd-apps/platform/ yet)
