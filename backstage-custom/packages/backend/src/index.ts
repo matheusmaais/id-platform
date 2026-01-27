@@ -1,15 +1,26 @@
+/*
+ * Backstage Backend with OIDC Support
+ * Based on official Backstage template
+ */
+
 import { createBackend } from '@backstage/backend-defaults';
 
 const backend = createBackend();
 
-// Auth - CRITICAL: OIDC provider for Cognito
+// Proxy backend
+backend.add(import('@backstage/plugin-proxy-backend'));
+
+// Auth plugin with OIDC provider (replaces guest provider)
 backend.add(import('@backstage/plugin-auth-backend'));
 backend.add(import('@backstage/plugin-auth-backend-module-oidc-provider'));
 
-// Catalog - with all required dependencies
+// Catalog plugin with scaffolder entity model
 backend.add(import('@backstage/plugin-catalog-backend'));
+backend.add(
+  import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'),
+);
 
-// Permission
+// Permission plugin
 backend.add(import('@backstage/plugin-permission-backend'));
 backend.add(
   import('@backstage/plugin-permission-backend-module-allow-all-policy'),
