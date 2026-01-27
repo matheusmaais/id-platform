@@ -265,6 +265,59 @@ Branch: main
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-27: Backstage OIDC Authentication Fixed ✅
+**Status:** ✅ COMPLETE (Backstage with Cognito OIDC working)
+
+**Problem:**
+- Backstage accessible without login (guest mode)
+- Catalog API returning 401 errors
+- Missing COGNITO_ISSUER in Kubernetes secret
+- Missing signInPage configuration
+
+**Root Causes:**
+1. Backstage defaulting to guest authentication
+2. `backstage-cognito` secret missing `COGNITO_ISSUER` field
+3. No `signInPage` configuration to force OIDC login
+
+**Solutions Applied:**
+1. **Added `signInPage: oidc` to app-config:**
+```yaml
+# platform-apps/backstage/values.yaml
+appConfig:
+  signInPage: oidc  # Force OIDC login, disable guest
+```
+
+2. **Added COGNITO_ISSUER to Terraform secret:**
+```hcl
+# terraform/platform-gitops/secrets.tf
+data = {
+  COGNITO_CLIENT_ID     = aws_cognito_user_pool_client.backstage.id
+  COGNITO_CLIENT_SECRET = aws_cognito_user_pool_client.backstage.client_secret
+  COGNITO_ISSUER        = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+}
+```
+
+3. **Manually patched secret in cluster:**
+```bash
+kubectl patch secret backstage-cognito -n backstage \
+  --type='json' \
+  -p='[{"op": "add", "path": "/data/COGNITO_ISSUER", "value": "..."}]'
+```
+
+**Validation:**
+- ✅ Backstage pod restarted successfully
+- ✅ All three Cognito environment variables present
+- ✅ No more 401 errors in logs
+- ✅ OIDC authentication enabled
+
+**Next:** Test end-to-end Cognito login flow
+
+**Commits:** 
+- 356814b - "fix(backstage): enable OIDC sign-in page"
+- 5ceb601 - "fix(terraform): add COGNITO_ISSUER to Backstage secret"
+
+---
+
 ### 2026-01-27: Backstage ArgoCD Sync Fixed ✅
 **Status:** ✅ COMPLETE (Backstage Synced and Healthy)
 
