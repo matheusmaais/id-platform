@@ -98,6 +98,8 @@ ingress:
     external-dns.alpha.kubernetes.io/hostname: ""  # Set via ApplicationSet
 
 # PostgreSQL (in-cluster for development)
+# Note: Using ephemeral storage for Phase 0 (dev environment)
+# TODO: For production, enable persistence with EBS CSI driver IRSA
 postgresql:
   enabled: true
   auth:
@@ -106,9 +108,7 @@ postgresql:
     database: backstage
   primary:
     persistence:
-      enabled: true
-      size: 10Gi
-      storageClass: gp2
+      enabled: false  # Disable for Phase 0 (no EBS CSI IRSA yet)
     resources:
       requests:
         cpu: 250m
