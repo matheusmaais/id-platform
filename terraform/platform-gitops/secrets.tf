@@ -161,9 +161,9 @@ resource "kubernetes_secret" "backstage_github" {
 
   data = {
     GITHUB_TOKEN               = var.github_token
-    GITHUB_APP_ID              = coalesce(var.github_app_id, "")
-    GITHUB_APP_INSTALLATION_ID = coalesce(var.github_app_installation_id, "")
-    GITHUB_APP_PRIVATE_KEY     = coalesce(var.github_app_private_key, "")
+    GITHUB_APP_ID              = var.github_app_id != null ? var.github_app_id : ""
+    GITHUB_APP_INSTALLATION_ID = var.github_app_installation_id != null ? var.github_app_installation_id : ""
+    GITHUB_APP_PRIVATE_KEY     = var.github_app_private_key != null ? var.github_app_private_key : ""
   }
 
   type = "Opaque"
