@@ -11,3 +11,24 @@ variable "github_token" {
   sensitive   = true
 }
 
+variable "github_app_id" {
+  description = "GitHub App ID for ArgoCD SCM Provider (optional)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "github_app_installation_id" {
+  description = "GitHub App Installation ID for ArgoCD SCM Provider (optional)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "github_app_private_key" {
+  description = "GitHub App private key PEM for ArgoCD SCM Provider (optional)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+

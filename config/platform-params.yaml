@@ -10,6 +10,14 @@ repository:
   url: https://github.com/matheusmaais/id-platform
   raw_url: https://raw.githubusercontent.com/matheusmaais/id-platform
 
+github:
+  org: matheusmaais
+  appName: daredelabs-idp-backstage
+  appRepoPrefix: "idp-"
+  appRepoVisibility: private  # public | private
+  scmAuth: token              # token | app (if app, requires GITHUB_APP_* in .env)
+  actionsRoleName: github-actions-ecr-push # IAM Role name assumed by GitHub Actions (OIDC, manual prereq)
+
 # Infrastructure parameters (must match Terraform configuration)
 infrastructure:
   domain: timedevops.click
@@ -22,6 +30,7 @@ infrastructure:
 
 identity:
   cognitoAdminEmail: admin@timedevops.click
+  allowedEmailDomains: []  # Extra domains besides main domain
 
 tags:
   Project: Internal Developer Platform

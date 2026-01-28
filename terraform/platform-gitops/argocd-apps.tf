@@ -17,8 +17,8 @@ resource "kubectl_manifest" "platform_apps" {
       project = "default"
 
       source = {
-        repoURL        = "https://github.com/matheusmaais/id-platform"
-        targetRevision = "main"
+        repoURL        = local.platform_repo_url
+        targetRevision = local.platform_repo_branch
         path           = "argocd-apps/platform"
       }
 

@@ -61,6 +61,60 @@ resource "kubernetes_secret" "argocd_repo_creds" {
   ]
 }
 
+# GitHub SCM token for ApplicationSet SCM provider generator (fallback when GitHub App is not configured)
+resource "kubernetes_secret" "argocd_scm_token" {
+  metadata {
+    name      = "github-scm-token"
+    namespace = local.argocd.namespace
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+      "app.kubernetes.io/part-of"    = "platform-gitops"
+    }
+  }
+
+  data = {
+    token = var.github_token
+  }
+
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# ArgoCD SCM Provider Credentials (GitHub App)
+resource "kubernetes_secret" "argocd_github_app_creds" {
+  count = local.github_app_enabled ? 1 : 0
+
+  metadata {
+    name      = "github-app-credentials"
+    namespace = local.argocd.namespace
+    labels = {
+      "app.kubernetes.io/managed-by"   = "terraform"
+      "app.kubernetes.io/part-of"      = "platform-gitops"
+      "argocd.argoproj.io/secret-type" = "repo-creds"
+    }
+    annotations = {
+      "argocd.argoproj.io/secret-type" = "repo-creds"
+    }
+  }
+
+  data = {
+    url                     = "https://github.com"
+    githubAppID             = var.github_app_id
+    githubAppInstallationID = var.github_app_installation_id
+    githubAppPrivateKey     = var.github_app_private_key
+    type                    = "git"
+  }
+
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
 # Backstage Cognito Credentials
 resource "random_password" "backstage_auth_session_secret" {
   length  = 64
@@ -83,6 +137,33 @@ resource "kubernetes_secret" "backstage_cognito" {
     COGNITO_CLIENT_SECRET = aws_cognito_user_pool_client.backstage.client_secret
     COGNITO_ISSUER        = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
     AUTH_SESSION_SECRET   = random_password.backstage_auth_session_secret.result
+  }
+
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.argocd,
+    kubernetes_namespace.backstage
+  ]
+}
+
+# Backstage GitHub credentials (token + optional GitHub App)
+resource "kubernetes_secret" "backstage_github" {
+  metadata {
+    name      = "backstage-github"
+    namespace = "backstage"
+    labels = {
+      "app.kubernetes.io/name"       = "backstage"
+      "app.kubernetes.io/managed-by" = "terraform"
+      "app.kubernetes.io/part-of"    = "platform-gitops"
+    }
+  }
+
+  data = {
+    GITHUB_TOKEN               = var.github_token
+    GITHUB_APP_ID              = coalesce(var.github_app_id, "")
+    GITHUB_APP_INSTALLATION_ID = coalesce(var.github_app_installation_id, "")
+    GITHUB_APP_PRIVATE_KEY     = coalesce(var.github_app_private_key, "")
   }
 
   type = "Opaque"

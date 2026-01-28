@@ -9,8 +9,16 @@ locals {
   cognito_admin_email         = local.platform_config.identity.cognitoAdminEmail
   cognito_admin_temp_password = var.cognito_admin_temp_password
   platform_repo_url           = local.platform_config.repository.url
+  platform_repo_branch        = local.platform_config.repository.branch
   github_username             = "x-access-token"
   github_repo_creds_url       = element(regexall("^https?://[^/]+", local.platform_repo_url), 0)
+  github_org                  = local.platform_config.github.org
+  github_repo_prefix          = local.platform_config.github.appRepoPrefix
+  github_repo_visibility      = try(local.platform_config.github.appRepoVisibility, "private")
+  github_scm_auth             = try(local.platform_config.github.scmAuth, "token")
+  github_app_name             = try(local.platform_config.github.appName, "")
+  github_actions_role_name    = try(local.platform_config.github.actionsRoleName, "github-actions-ecr-push")
+  github_app_enabled          = var.github_app_id != null && var.github_app_installation_id != null && var.github_app_private_key != null
   allowed_email_domains = distinct(concat(
     try(local.platform_config.identity.allowedEmailDomains, []),
     [local.domain, split("@", local.cognito_admin_email)[1]],

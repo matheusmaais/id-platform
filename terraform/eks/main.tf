@@ -37,7 +37,7 @@ resource "aws_security_group" "platform_alb" {
   }
 
   tags = merge(var.default_tags, {
-    Name = "${var.cluster_name}-platform-alb"
+    Name    = "${var.cluster_name}-platform-alb"
     Purpose = "Shared ALB for platform apps"
   })
 

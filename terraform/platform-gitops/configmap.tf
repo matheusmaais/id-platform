@@ -43,6 +43,21 @@ resource "kubernetes_config_map" "platform_params" {
 
     # Auth (Backstage) - keep file-driven via config/platform-params.yaml
     AUTH_ALLOWED_EMAIL_DOMAINS = join(",", local.allowed_email_domains)
+
+    # GitHub (Scaffolder + ArgoCD AppSet)
+    GITHUB_ORG               = local.github_org
+    GITHUB_APP_NAME          = local.github_app_name
+    GITHUB_REPO_PREFIX       = local.github_repo_prefix
+    GITHUB_REPO_VISIBILITY   = local.github_repo_visibility
+    GITHUB_SCM_AUTH          = local.github_scm_auth
+    GITHUB_ACTIONS_ROLE_NAME = local.github_actions_role_name
+
+    # Platform repo (templates + configuration)
+    PLATFORM_REPO_URL    = local.platform_repo_url
+    PLATFORM_REPO_BRANCH = local.platform_repo_branch
+
+    # ECR Configuration (derived)
+    ECR_REGISTRY = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"
   }
 
   depends_on = [

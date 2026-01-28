@@ -237,6 +237,11 @@ resource "helm_release" "argocd" {
       # Dex (OIDC proxy)
       dex = {
         enabled = true
+        # Rollout protection: forces Dex pods restart when Cognito hosted UI domain changes.
+        # Cognito OIDC discovery uses the User Pool Domain for authorization/token endpoints.
+        podAnnotations = {
+          "idp.darede.io/cognito-domain" = local.cognito.oauth_domain_prefix
+        }
         resources = {
           requests = {
             cpu    = "10m"
