@@ -52,6 +52,8 @@ backstage:
     # Cognito SSO - values from Secret
     auth:
       environment: development
+      session:
+        secret: ${AUTH_SESSION_SECRET}
       providers:
         # Disable guest provider - force OIDC authentication
         guest: null

@@ -62,6 +62,11 @@ resource "kubernetes_secret" "argocd_repo_creds" {
 }
 
 # Backstage Cognito Credentials
+resource "random_password" "backstage_auth_session_secret" {
+  length  = 64
+  special = true
+}
+
 resource "kubernetes_secret" "backstage_cognito" {
   metadata {
     name      = "backstage-cognito"
@@ -77,6 +82,7 @@ resource "kubernetes_secret" "backstage_cognito" {
     COGNITO_CLIENT_ID     = aws_cognito_user_pool_client.backstage.id
     COGNITO_CLIENT_SECRET = aws_cognito_user_pool_client.backstage.client_secret
     COGNITO_ISSUER        = "https://cognito-idp.${local.region}.amazonaws.com/${aws_cognito_user_pool.main.id}"
+    AUTH_SESSION_SECRET   = random_password.backstage_auth_session_secret.result
   }
 
   type = "Opaque"
