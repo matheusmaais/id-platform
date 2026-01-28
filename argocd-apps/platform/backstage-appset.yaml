@@ -17,7 +17,7 @@ spec:
   generators:
     # Git File Generator - reads config/platform-params.yaml
     - git:
-        repoURL: 'https://github.com/matheusmaais/id-platform'
+        repoURL: 'https://github.com/darede-labs/idp-platform'
         revision: 'main'
         files:
           - path: "config/platform-params.yaml"

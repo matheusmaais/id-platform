@@ -128,7 +128,7 @@ policy.default = role:readonly
 
 ### 5. App-of-Apps Pattern
 - **Application Name:** `platform-apps`
-- **Repository:** https://github.com/matheusmaais/id-platform
+- **Repository:** https://github.com/darede-labs/idp-platform
 - **Branch:** `main`
 - **Path:** `argocd-apps/platform/`
 - **Sync Policy:** Automated (prune + self-heal)

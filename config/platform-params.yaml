@@ -3,15 +3,15 @@
 # Change these values when forking or migrating to different org/repo
 
 repository:
-  org: matheusmaais
-  name: id-platform
+  org: darede-labs
+  name: idp-platform
   branch: main
   # Computed fields for convenience
-  url: https://github.com/matheusmaais/id-platform
-  raw_url: https://raw.githubusercontent.com/matheusmaais/id-platform
+  url: https://github.com/darede-labs/idp-platform
+  raw_url: https://raw.githubusercontent.com/darede-labs/idp-platform
 
 github:
-  org: matheusmaais
+  org: darede-labs
   appName: daredelabs-idp-backstage
   appRepoPrefix: "idp-"
   appRepoVisibility: private  # public | private

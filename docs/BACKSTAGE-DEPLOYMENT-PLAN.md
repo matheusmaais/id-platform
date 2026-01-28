@@ -24,7 +24,7 @@ All repository, organization, and chart version references are **dynamically par
 ```yaml
 # ❌ Before (hardcoded in multiple places)
 valueFiles:
-  - https://raw.githubusercontent.com/matheusmaais/id-platform/main/platform-apps/backstage/values.yaml
+  - https://raw.githubusercontent.com/darede-labs/idp-platform/main/platform-apps/backstage/values.yaml
 annotations:
   external-dns.alpha.kubernetes.io/hostname: backstage.timedevops.click
 hosts:
@@ -215,7 +215,7 @@ spec:
     helm:
       releaseName: backstage
       valueFiles:
-        - https://raw.githubusercontent.com/matheusmaais/id-platform/main/platform-apps/backstage/values-dev.yaml
+        - https://raw.githubusercontent.com/darede-labs/idp-platform/main/platform-apps/backstage/values-dev.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: backstage
@@ -370,7 +370,7 @@ Via `app-config.yaml`:
 catalog:
   locations:
     - type: url
-      target: https://raw.githubusercontent.com/matheusmaais/id-platform/main/platform-apps/backstage/templates/*/template.yaml
+      target: https://raw.githubusercontent.com/darede-labs/idp-platform/main/platform-apps/backstage/templates/*/template.yaml
       rules:
         - allow: [Template]
 ```

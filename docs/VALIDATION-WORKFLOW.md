@@ -104,7 +104,7 @@ make validate-params
 org: matheusmaais
 name: id-platform
 branch: main
-url: https://github.com/matheusmaais/id-platform
+url: https://github.com/darede-labs/idp-platform
 domain: timedevops.click
 backstageDomain: backstage.timedevops.click
 albGroupName: dev-platform

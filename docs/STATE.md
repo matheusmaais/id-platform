@@ -1076,7 +1076,7 @@ Avoid duplicated values across `.env`, `locals`, and Terraform code.
 - Updated STATE.md with repository name
 - Created comprehensive README.md
 
-**Repository:** https://github.com/matheusmaais/id-platform
+**Repository:** https://github.com/darede-labs/idp-platform
 
 **Why:**
 - Fresh start with clean git history
