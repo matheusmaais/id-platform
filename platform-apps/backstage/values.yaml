@@ -6,27 +6,22 @@
 
 # Global values (injected by ApplicationSet)
 global:
-  domain: ""  # Will be set by ApplicationSet from ConfigMap
-  albGroupName: ""  # Will be set by ApplicationSet from ConfigMap
-
+  domain: "" # Will be set by ApplicationSet from ConfigMap
+  albGroupName: "" # Will be set by ApplicationSet from ConfigMap
 backstage:
   replicas: 1
-
   # Custom image with OIDC support (ARM64 for Graviton/t4g)
   image:
     registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com
     repository: backstage-platform
-    tag: "20260127-backstage-v1.47.1"
-
+    tag: "20260128-backstage-v1.47.1"
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:
     - platform-params
-
   # Inject environment variables from Secrets  
   extraEnvVarsSecrets:
     - backstage-cognito
     - backstage-postgresql
-
   # Backstage app-config (uses environment variable substitution at runtime)
   appConfig:
     app:
@@ -34,7 +29,6 @@ backstage:
       baseUrl: https://${BACKSTAGE_DOMAIN}
       # Sign-in configuration - force OIDC login, disable guest
       signInPage: oidc
-
     backend:
       baseUrl: https://${BACKSTAGE_DOMAIN}
       listen:
@@ -48,7 +42,6 @@ backstage:
           user: ${POSTGRES_USER}
           password: ${POSTGRES_PASSWORD}
           database: ${POSTGRES_DB}
-
     # Cognito SSO - values from Secret
     auth:
       environment: development
@@ -66,7 +59,6 @@ backstage:
             signIn:
               resolvers:
                 - resolver: emailMatchingUserEntityProfileEmail
-
     # Catalog configuration
     catalog:
       rules:
@@ -74,7 +66,6 @@ backstage:
       locations:
         - type: url
           target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
-
   # Resources
   resources:
     requests:
@@ -83,7 +74,6 @@ backstage:
     limits:
       cpu: 1000m
       memory: 1Gi
-
 # Ingress with shared ALB
 # Note: ingress.host is set via ArgoCD ApplicationSet parameter
 # Ingress configuration
@@ -92,7 +82,7 @@ backstage:
 ingress:
   enabled: true
   className: alb
-  host: ""  # Set via ArgoCD ApplicationSet parameter
+  host: "" # Set via ArgoCD ApplicationSet parameter
   path: /
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -107,8 +97,7 @@ ingress:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
     # External DNS for automatic Route53 record creation
-    external-dns.alpha.kubernetes.io/hostname: ""  # Set via ApplicationSet
-
+    external-dns.alpha.kubernetes.io/hostname: "" # Set via ApplicationSet
 # PostgreSQL (in-cluster for development)
 # Note: Using ephemeral storage for Phase 0 (dev environment)
 # TODO: For production, enable persistence with EBS CSI driver IRSA
@@ -120,7 +109,7 @@ postgresql:
     database: backstage
   primary:
     persistence:
-      enabled: false  # Disable for Phase 0 (no EBS CSI IRSA yet)
+      enabled: false # Disable for Phase 0 (no EBS CSI IRSA yet)
     resources:
       requests:
         cpu: 250m
