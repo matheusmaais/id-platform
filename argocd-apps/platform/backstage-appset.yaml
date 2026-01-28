@@ -51,9 +51,13 @@ spec:
                 value: '{{.infrastructure.backstageDomain}}'
               - name: global.albGroupName
                 value: '{{.infrastructure.albGroupName}}'
-              # Image registry (dynamic from ConfigMap)
+              # Image configuration (from platform-params.yaml)
               - name: backstage.image.registry
-                value: '{{index . "ECR_REGISTRY"}}'
+                value: '{{.images.backstage.registry}}'
+              - name: backstage.image.repository
+                value: '{{.images.backstage.repository}}'
+              - name: backstage.image.tag
+                value: '{{.images.backstage.tag}}'
               # Ingress host must be set explicitly
               - name: ingress.host
                 value: '{{.infrastructure.backstageDomain}}'

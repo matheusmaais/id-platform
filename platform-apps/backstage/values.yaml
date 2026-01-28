@@ -11,11 +11,11 @@ global:
 backstage:
   replicas: 1
   # Custom image with OIDC support (ARM64 for Graviton/t4g)
-  # Image registry is set via ApplicationSet Helm parameter (from ConfigMap ECR_REGISTRY)
+  # Image values are set via ApplicationSet Helm parameters (from platform-params.yaml)
   image:
-    registry: "" # Set via ApplicationSet parameter
-    repository: backstage-platform
-    tag: "20260128-backstage-v1.47.1-authz"
+    registry: "" # Set via ApplicationSet parameter from images.backstage.registry
+    repository: "" # Set via ApplicationSet parameter from images.backstage.repository
+    tag: "" # Set via ApplicationSet parameter from images.backstage.tag
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:
     - platform-params

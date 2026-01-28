@@ -36,6 +36,12 @@ tags:
   Project: Internal Developer Platform
   Terraform: "true"
 
+images:
+  backstage:
+    registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com  # ECR registry (account-specific)
+    repository: backstage-platform
+    tag: "20260128-backstage-v1.47.1-authz"
+
 charts:
   backstage:
     version: "2.6.3"  # Latest stable (verified 2026-01-27)
