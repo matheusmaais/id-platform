@@ -11,9 +11,9 @@ global:
 backstage:
   replicas: 1
   # Custom image with OIDC support (ARM64 for Graviton/t4g)
-  # Image registry derived from ECR_REGISTRY environment variable
+  # Image registry is set via ApplicationSet Helm parameter (from ConfigMap ECR_REGISTRY)
   image:
-    registry: ${ECR_REGISTRY}
+    registry: "" # Set via ApplicationSet parameter
     repository: backstage-platform
     tag: "20260128-backstage-v1.47.1-authz"
   # Inject environment variables from ConfigMaps
