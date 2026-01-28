@@ -11,8 +11,9 @@ global:
 backstage:
   replicas: 1
   # Custom image with OIDC support (ARM64 for Graviton/t4g)
+  # Image registry derived from ECR_REGISTRY environment variable
   image:
-    registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com
+    registry: ${ECR_REGISTRY}
     repository: backstage-platform
     tag: "20260128-backstage-v1.47.1-authz"
   # Inject environment variables from ConfigMaps
@@ -22,6 +23,7 @@ backstage:
   extraEnvVarsSecrets:
     - backstage-cognito
     - backstage-postgresql
+    - backstage-github
   # Backstage app-config (uses environment variable substitution at runtime)
   appConfig:
     app:
@@ -56,6 +58,31 @@ backstage:
             clientId: ${COGNITO_CLIENT_ID}
             clientSecret: ${COGNITO_CLIENT_SECRET}
             prompt: auto
+    # GitHub integration (token)
+    # NOTE: Keep token-based integration as default because GitHub App fields are not safely optional
+    # in static YAML (empty env vars may break Backstage config parsing). ArgoCD SCM provider supports
+    # GitHub App or token dynamically via Terraform.
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
+    # Scaffolder defaults (from platform-params ConfigMap)
+    scaffolder:
+      defaultEnvironment:
+        parameters:
+          githubOrg: ${GITHUB_ORG}
+          repoPrefix: ${GITHUB_REPO_PREFIX}
+          repoVisibility: ${GITHUB_REPO_VISIBILITY}
+          githubAppName: ${GITHUB_APP_NAME}
+          githubActionsRoleName: ${GITHUB_ACTIONS_ROLE_NAME}
+          domain: ${DOMAIN}
+          albGroupName: ${ALB_GROUP_NAME}
+          albSecurityGroupId: ${ALB_SECURITY_GROUP_ID}
+          acmCertificateArn: ${ACM_CERTIFICATE_ARN}
+          ecrRegistry: ${ECR_REGISTRY}
+          awsRegion: ${AWS_REGION}
+          awsAccountId: ${AWS_ACCOUNT_ID}
+          clusterName: ${CLUSTER_NAME}
     # Platform identity policy (read by backend auth resolver)
     identity:
       allowedEmailDomains: ${AUTH_ALLOWED_EMAIL_DOMAINS}
@@ -64,6 +91,10 @@ backstage:
       rules:
         - allow: [Component, System, API, Resource, Location]
       locations:
+        - type: url
+          target: ${PLATFORM_REPO_URL}/blob/${PLATFORM_REPO_BRANCH}/backstage-custom/templates/idp-nodejs-app/template.yaml
+          rules:
+            - allow: [Template]
         - type: url
           target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
   # Resources
@@ -87,7 +118,7 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/group.name: dev-platform
+    alb.ingress.kubernetes.io/group.name: "" # Set via ApplicationSet from ConfigMap
     alb.ingress.kubernetes.io/group.order: "200"
     alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"

@@ -54,6 +54,9 @@ spec:
               # Ingress host must be set explicitly
               - name: ingress.host
                 value: '{{.infrastructure.backstageDomain}}'
+              # Ingress ALB group name (dynamic)
+              - name: ingress.annotations.alb\.ingress\.kubernetes\.io/group\.name
+                value: '{{.infrastructure.albGroupName}}'
               # External DNS annotation for Route53 record
               - name: ingress.annotations.external-dns\.alpha\.kubernetes\.io/hostname
                 value: '{{.infrastructure.backstageDomain}}'

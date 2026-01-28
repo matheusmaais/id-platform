@@ -1,0 +1,113 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: idp-nodejs-app
+  title: Create Node.js Application
+  description: Create a new Node.js application with GitOps deployment
+  tags:
+    - nodejs
+    - recommended
+spec:
+  owner: platform-team
+  type: service
+  
+  parameters:
+    - title: Application Details
+      required:
+        - name
+        - description
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the application (lowercase, no spaces)
+          pattern: '^[a-z][a-z0-9-]*$'
+          ui:autofocus: true
+          ui:help: 'Example: my-api or user-service'
+        description:
+          title: Description
+          type: string
+          description: Short description of the application
+        owner:
+          title: Owner
+          type: string
+          description: Team or user owning this application
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [User, Group]
+    
+    - title: Deployment Configuration
+      required:
+        - replicas
+      properties:
+        replicas:
+          title: Replicas
+          type: integer
+          description: Number of replicas to run
+          default: 2
+          minimum: 1
+          maximum: 10
+        exposePublic:
+          title: Expose Publicly
+          type: boolean
+          description: Create public ingress for this application
+          default: false
+  
+  steps:
+    # Step 1: Fetch template skeleton
+    - id: fetch-base
+      name: Fetch Base
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          replicas: ${{ parameters.replicas }}
+          exposePublic: ${{ parameters.exposePublic }}
+          # From environment.parameters (platform-params ConfigMap)
+          githubOrg: ${{ environment.parameters.githubOrg }}
+          repoPrefix: ${{ environment.parameters.repoPrefix }}
+          repoVisibility: ${{ environment.parameters.repoVisibility }}
+          domain: ${{ environment.parameters.domain }}
+          albGroupName: ${{ environment.parameters.albGroupName }}
+          albSecurityGroupId: ${{ environment.parameters.albSecurityGroupId }}
+          acmCertificateArn: ${{ environment.parameters.acmCertificateArn }}
+          ecrRegistry: ${{ environment.parameters.ecrRegistry }}
+          awsRegion: ${{ environment.parameters.awsRegion }}
+          awsAccountId: ${{ environment.parameters.awsAccountId }}
+          githubActionsRoleName: ${{ environment.parameters.githubActionsRoleName }}
+          clusterName: ${{ environment.parameters.clusterName }}
+    
+    # Step 2: Create GitHub repository
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        description: ${{ parameters.description }}
+        repoUrl: github.com?owner=${{ environment.parameters.githubOrg }}&repo=${{ environment.parameters.repoPrefix }}${{ parameters.name }}
+        repoVisibility: ${{ environment.parameters.repoVisibility }}
+        defaultBranch: main
+        protectDefaultBranch: false
+    
+    # Step 3: Register component in catalog
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+  
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+      - title: CI Pipeline
+        url: ${{ steps['publish'].output.remoteUrl }}/actions
+      - title: ArgoCD Application
+        url: https://argocd.${{ environment.parameters.domain }}/applications/${{ environment.parameters.repoPrefix }}${{ parameters.name }}

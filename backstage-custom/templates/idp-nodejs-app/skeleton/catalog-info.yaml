@@ -1,0 +1,29 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    github.com/project-slug: ${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}
+    backstage.io/kubernetes-id: ${{ values.name }}
+    argocd/app-name: ${{ values.repoPrefix }}${{ values.name }}
+  links:
+    - url: https://github.com/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}
+      title: Repository
+      icon: github
+    - url: https://github.com/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}/actions
+      title: CI Pipeline
+      icon: github
+    - url: https://argocd.${{ values.domain }}/applications/${{ values.repoPrefix }}${{ values.name }}
+      title: ArgoCD
+      icon: dashboard
+{% if values.exposePublic %}
+    - url: https://${{ values.name }}.${{ values.domain }}
+      title: Application
+      icon: web
+{% endif %}
+spec:
+  type: service
+  lifecycle: production
+  owner: ${{ values.owner }}
+  system: platform
