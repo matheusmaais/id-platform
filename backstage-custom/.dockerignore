@@ -1,9 +1,6 @@
-node_modules
-dist
 .git
-.gitignore
-*.md
-.env*
-.DS_Store
-coverage
-.nyc_output
+.yarn/cache
+.yarn/install-state.gz
+node_modules
+packages/*/node_modules
+*.local.yaml

@@ -1,10 +1,20 @@
 .PHONY: help init-all init-vpc init-eks init-addons init-gitops plan-all plan-vpc plan-eks plan-addons plan-gitops \
         apply-vpc apply-eks apply-addons apply-gitops destroy-addons destroy-eks destroy-vpc destroy-gitops destroy-cluster \
-        configure-kubectl validate validate-gitops test-karpenter install destroy validate-env validate-params status
+        configure-kubectl validate validate-gitops test-karpenter install destroy validate-env validate-params status \
+        validate-backstage build-backstage-image push-backstage-image
 
 ENV_FILE ?= .env
 ENV_LOADER = set -a; [ -f "$(ENV_FILE)" ] && . "$(ENV_FILE)"; set +a
 CONFIG_FILE ?= config/platform-params.yaml
+
+# Backstage image build (values.yaml is the source of truth)
+BACKSTAGE_VALUES_FILE ?= platform-apps/backstage/values.yaml
+BACKSTAGE_DIR ?= backstage-custom
+BACKSTAGE_PLATFORM ?= linux/arm64
+BACKSTAGE_IMAGE_REGISTRY ?= $(shell yq eval '.backstage.image.registry' $(BACKSTAGE_VALUES_FILE))
+BACKSTAGE_IMAGE_REPOSITORY ?= $(shell yq eval '.backstage.image.repository' $(BACKSTAGE_VALUES_FILE))
+BACKSTAGE_IMAGE_TAG ?= $(shell yq eval '.backstage.image.tag' $(BACKSTAGE_VALUES_FILE))
+BACKSTAGE_IMAGE ?= $(BACKSTAGE_IMAGE_REGISTRY)/$(BACKSTAGE_IMAGE_REPOSITORY):$(BACKSTAGE_IMAGE_TAG)
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -225,6 +235,29 @@ validate-platform: configure-kubectl ## Validate platform applications deploymen
 	@echo "  [x] bootstrap-platform"
 	@echo "  [x] install-backstage"
 	@echo "  [x] validate-platform"
+
+validate-backstage: ## Validate Backstage deps + build (deterministic)
+	@echo "==> Validating Backstage (yarn install --immutable + build)"
+	@cd $(BACKSTAGE_DIR) && \
+		corepack enable && \
+		corepack yarn install --immutable && \
+		corepack yarn tsc && \
+		corepack yarn build:backend
+
+build-backstage-image: ## Build Backstage ARM64 image from backstage-custom/
+	@echo "==> Building Backstage image: $(BACKSTAGE_IMAGE)"
+	@cd $(BACKSTAGE_DIR) && \
+		docker buildx build --platform $(BACKSTAGE_PLATFORM) \
+			-f packages/backend/Dockerfile \
+			-t $(BACKSTAGE_IMAGE) --load .
+
+push-backstage-image: build-backstage-image ## Push Backstage image to ECR (uses awsProfile from config)
+	@echo "==> Pushing Backstage image: $(BACKSTAGE_IMAGE)"
+	@PROFILE=$$(yq eval '.infrastructure.awsProfile' $(CONFIG_FILE)); \
+	REGION=$$(yq eval '.infrastructure.awsRegion' $(CONFIG_FILE)); \
+	aws ecr get-login-password --region $$REGION --profile $$PROFILE | \
+		docker login --username AWS --password-stdin $(BACKSTAGE_IMAGE_REGISTRY)
+	docker push $(BACKSTAGE_IMAGE)
 
 get-credentials: ## Show all login credentials
 	@echo "=== ArgoCD Admin ==="

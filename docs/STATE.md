@@ -344,6 +344,76 @@ Cons:
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-27: Backstage dependency hell resolved (Backstage OSS v1.47.1) ✅
+**Status:** ✅ LOCAL COMPLETE / 🚧 READY FOR CLUSTER DEPLOY (image push + ArgoCD sync pending)
+
+**Problem:**
+- Backstage custom image failed at runtime with missing core services:
+  - `Missing: serviceRef{core.permissionsRegistry}, serviceRef{core.auditor}`
+
+**Root Cause:**
+- `@backstage/*` dependencies were set to `"latest"`, causing a **mismatched set of packages**.
+- In particular, `@backstage/backend-defaults` was effectively behind the plugin set, so required core services weren’t registered for plugins like `catalog`.
+
+**Fix (Approach A — regenerate deterministically):**
+1. **Confirmed latest Backstage OSS release** via GitHub Releases: `v1.47.1`
+2. **Regenerated the Backstage app** inside `backstage-custom/` using a pinned create-app:
+   - `npx @backstage/create-app@0.7.8` (no `@latest`)
+3. **Applied minimal customizations for Cognito OIDC (official module):**
+   - Added `@backstage/plugin-auth-backend-module-oidc-provider@0.4.11`
+   - Removed guest provider module from backend registration
+4. **Pinned all `@backstage/*` package versions** (removed `^`) to prevent drift.
+5. **Hardened Docker image (ARM64) with multi-stage build**:
+   - `backstage-custom/packages/backend/Dockerfile` now builds bundle + production deps in builder stage and runs as non-root.
+   - Fixed `backstage-custom/.dockerignore` to include sources (required for multi-stage build).
+
+**Final Versions (pins):**
+- Backstage OSS release: `v1.47.1`
+- `@backstage/create-app`: `0.7.8`
+- `@backstage/cli`: `0.35.2`
+- `@backstage/backend-defaults`: `0.15.0` (used by regenerated app)
+- `@backstage/plugin-auth-backend-module-oidc-provider`: `0.4.11`
+- Backstage image tag (Helm): `20260127-backstage-v1.47.1`
+
+**Validation (local):**
+```bash
+cd backstage-custom
+corepack enable
+
+# Deterministic deps + build
+YARN_ENABLE_IMMUTABLE_INSTALLS=false corepack yarn install
+corepack yarn install --immutable
+corepack yarn tsc
+corepack yarn build:backend
+
+# ARM64 container build (hardened)
+docker buildx build --platform linux/arm64 \
+  -f packages/backend/Dockerfile \
+  -t backstage-platform:local --load .
+
+# Container boots and healthcheck is OK
+docker run -d --rm -p 7007:7007 --name backstage-local backstage-platform:local
+sleep 8
+curl -fsS http://localhost:7007/healthcheck
+docker rm -f backstage-local
+```
+
+**Next (cluster / GitOps):**
+```bash
+# Build and push pinned image tag (reads tag from platform-apps/backstage/values.yaml)
+make validate-backstage
+make push-backstage-image
+
+# Sync and watch rollout
+argocd app sync backstage
+kubectl get pods -n backstage -w
+kubectl logs -n backstage deploy/backstage -f
+```
+
+**Refs (source of truth):**
+- Backstage OSS release `v1.47.1`: [Backstage `v1.47.1` release](https://github.com/backstage/backstage/releases/tag/v1.47.1)
+- Retrieved via: `gh api repos/backstage/backstage/releases/latest`
+
 ### 2026-01-27: Backstage OIDC Authentication Fixed ✅
 **Status:** ✅ COMPLETE (Backstage with Cognito OIDC working)
 
