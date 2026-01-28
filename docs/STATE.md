@@ -202,25 +202,67 @@ make install-app-platform    # Deploy AppProject + Workloads ApplicationSet
 make validate-app-platform   # Validate app platform components
 ```
 
-### 🚧 PENDING TASKS
+### 🚧 BLOCKED - GitHub Organization Required
 
-1. **GitHub OIDC Provider for AWS** (manual, pre-requisite)
+**Status**: ❌ BLOCKED - ArgoCD SCM Provider requires GitHub Organization
+
+**Root Cause**:
+- ArgoCD ApplicationSet SCM Provider **only works with GitHub Organizations**, not personal accounts
+- Current config: `github.org: matheusmaais` (personal user, not org)
+- SCM Provider API call: `GET /orgs/matheusmaais/repos` → **404 Not Found**
+- Error: `error listing repositories for matheusmaais: 404 Not Found`
+
+**Evidence**:
+```bash
+# matheusmaais is a user, not an org
+gh api /users/matheusmaais/repos  # ✅ Works (user repos)
+gh api /orgs/matheusmaais          # ❌ 404 (not an org)
+```
+
+**Resolution Options**:
+
+**Option A: Create GitHub Organization** (Recommended)
+```bash
+# 1. Create org "matheusmaais" or "darede-platform" on GitHub
+# 2. Update config/platform-params.yaml: github.org = <new-org>
+# 3. Re-apply: make apply-gitops
+```
+
+**Option B: Use Existing Organization**
+```bash
+# If you have an existing org (e.g., company org):
+# 1. Update config/platform-params.yaml: github.org = <existing-org>
+# 2. Re-apply: make apply-gitops
+```
+
+**Option C: Change to Git Directory Generator** (Workaround)
+- Replace SCM Provider with Git Directory generator
+- Manually create Application manifests in `argocd-apps/workloads/`
+- Loses auto-discovery capability
+- Not recommended (defeats Phase 2 goal)
+
+**DECISION REQUIRED**: Which option to proceed?
+
+### 🚧 PENDING TASKS (After Org Decision)
+
+1. **Create/Use GitHub Organization** (see options above)
+
+2. **GitHub OIDC Provider for AWS** (manual, pre-requisite)
    - Create OIDC provider: `token.actions.githubusercontent.com`
    - IAM Role: `github-actions-ecr-push`
-   - Trust policy for `matheusmaais/*` repos
+   - Trust policy for `<org>/*` repos
    - Permissions: ECR push + create repo
 
-2. **Deploy App Platform Components**:
+3. **Deploy App Platform Components**:
    ```bash
-   make apply-gitops           # Update ConfigMap with new vars
-   make install-app-platform   # Deploy AppProject + ApplicationSet
+   make apply-gitops           # Update ConfigMap with new org
    make validate-app-platform  # Verify components
    ```
 
-3. **Test End-to-End Flow**:
+4. **Test End-to-End Flow**:
    - Access Backstage: `https://backstage.timedevops.click`
    - Create App via template (e.g., `hello`)
-   - Verify repo created: `matheusmaais/idp-hello`
+   - Verify repo created: `<org>/idp-hello`
    - Watch CI pipeline execute
    - Verify ArgoCD discovers app
    - Check deployment: `kubectl get app idp-hello -n argocd`
