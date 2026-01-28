@@ -87,7 +87,7 @@ Includes:
 
 **Repository:** id-platform (migrated from reference-implementation-aws on 2026-01-24)
 Phase: Phase 0 — Bootstrap
-Status: ✅ GITOPS AUTH COMPLETE - Ready for SSO validation
+Status: ✅ BACKSTAGE + ARGOCD SSO WORKING (GitOps healthy)
 Branch: main
 
 ---
@@ -343,6 +343,47 @@ Cons:
 ---
 
 ## 🔄 RECENT CHANGES (Latest First)
+
+### 2026-01-28: Backstage SSO stabilized end-to-end (no guest, no catalog users required) ✅
+**Status:** ✅ CLUSTER COMPLETE / ✅ GITOPS RECONCILED (ArgoCD `Synced/Healthy`)
+
+**Problems observed (cluster):**
+- Backstage UI still showed **Guest** sign-in even with OIDC configured.
+- Cognito OIDC sign-in failed with:
+  - `authentication requires session support` (missing `auth.session.secret`)
+  - `Failed to sign-in, unable to resolve user identity` (resolver required catalog `User` entities)
+- Some values/config had drifted via manual steps; needed to be fully declarative for GitOps.
+
+**Root Causes:**
+- Frontend `SignInPage` was hardcoded to `providers={['guest']}` (UI-level config).
+- Backstage OIDC provider requires `auth.session.secret`.
+- Built-in resolver `emailMatchingUserEntityProfileEmail` requires `User` entities in the catalog.
+- Domain-related auth policy must not be hardcoded (domain can change); it must be file-driven.
+
+**Fix (GitOps + file-driven):**
+- **Frontend**: removed hardcoded guest provider and registered a Cognito-branded OIDC provider.
+- **Backend**:
+  - Added a custom OIDC `signInResolver` that **issues tokens without catalog users** (Phase 0),
+    while enforcing allowed domains from config.
+- **Dynamic domain allow-list (file-driven)**:
+  - Terraform `platform-gitops` now publishes `AUTH_ALLOWED_EMAIL_DOMAINS` in the `platform-params` ConfigMap.
+  - Backstage reads `identity.allowedEmailDomains: ${AUTH_ALLOWED_EMAIL_DOMAINS}` from `platform-apps/backstage/values.yaml`.
+- **Applied via**: `make apply-gitops` (Terraform) + image push + ArgoCD reconcile.
+
+**Current pinned image (cluster):**
+- `948881762705.dkr.ecr.us-east-1.amazonaws.com/backstage-platform:20260128-backstage-v1.47.1-authz`
+
+**Validation (cluster):**
+```bash
+kubectl get application backstage -n argocd
+kubectl get pods -n backstage -l app.kubernetes.io/name=backstage
+
+# ConfigMap shows allowed domains coming from Terraform/platform-params
+kubectl get configmap -n backstage platform-params -o jsonpath='{.data.AUTH_ALLOWED_EMAIL_DOMAINS}{"\n"}'
+
+# OIDC start endpoint redirects to Cognito (HTTP 302)
+curl -sSI "https://backstage.timedevops.click/api/auth/oidc/start?env=development" | head -n 8
+```
 
 ### 2026-01-27: Backstage dependency hell resolved (Backstage OSS v1.47.1) ✅
 **Status:** ✅ LOCAL COMPLETE / 🚧 READY FOR CLUSTER DEPLOY (image push + ArgoCD sync pending)
