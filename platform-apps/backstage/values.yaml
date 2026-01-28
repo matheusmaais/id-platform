@@ -14,7 +14,7 @@ backstage:
   image:
     registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com
     repository: backstage-platform
-    tag: "20260128-backstage-v1.47.1"
+    tag: "20260128-backstage-v1.47.1-authz"
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:
     - platform-params
@@ -56,9 +56,9 @@ backstage:
             clientId: ${COGNITO_CLIENT_ID}
             clientSecret: ${COGNITO_CLIENT_SECRET}
             prompt: auto
-            signIn:
-              resolvers:
-                - resolver: emailMatchingUserEntityProfileEmail
+    # Platform identity policy (read by backend auth resolver)
+    identity:
+      allowedEmailDomains: ${AUTH_ALLOWED_EMAIL_DOMAINS}
     # Catalog configuration
     catalog:
       rules:

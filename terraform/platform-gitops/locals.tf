@@ -11,6 +11,10 @@ locals {
   platform_repo_url           = local.platform_config.repository.url
   github_username             = "x-access-token"
   github_repo_creds_url       = element(regexall("^https?://[^/]+", local.platform_repo_url), 0)
+  allowed_email_domains = distinct(concat(
+    try(local.platform_config.identity.allowedEmailDomains, []),
+    [local.domain, split("@", local.cognito_admin_email)[1]],
+  ))
 
   # Domain Configuration
   subdomains = {

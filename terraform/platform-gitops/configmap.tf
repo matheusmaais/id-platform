@@ -40,6 +40,9 @@ resource "kubernetes_config_map" "platform_params" {
 
     # ACM Certificate ARN
     ACM_CERTIFICATE_ARN = data.aws_acm_certificate.main.arn
+
+    # Auth (Backstage) - keep file-driven via config/platform-params.yaml
+    AUTH_ALLOWED_EMAIL_DOMAINS = join(",", local.allowed_email_domains)
   }
 
   depends_on = [
