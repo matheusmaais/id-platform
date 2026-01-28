@@ -183,6 +183,7 @@ cleanup-test: configure-kubectl ## Cleanup test deployment
 
 validate-params: ## Validate platform parametrization (Git config + ConfigMap + ApplicationSet)
 	@./scripts/validate-params.sh
+	@echo "✅ Platform parameters validated"
 ifneq ($(filter validate-params,$(MAKECMDGOALS)),)
 	@echo "\nNext steps:"
 	@echo "  [ ] apply-gitops          (run: make apply-gitops)"
@@ -235,6 +236,31 @@ validate-platform: configure-kubectl ## Validate platform applications deploymen
 	@echo "  [x] bootstrap-platform"
 	@echo "  [x] install-backstage"
 	@echo "  [x] validate-platform"
+
+install-app-platform: init-gitops ## Install app platform components (Terraform-managed kubectl_manifests)
+	@echo "=== Installing App Platform Components (Terraform) ==="
+	@$(ENV_LOADER); \
+	export TF_VAR_github_token=$$GITHUB_TOKEN; \
+	export TF_VAR_cognito_admin_temp_password=$$COGNITO_ADMIN_TEMP_PASSWORD; \
+	export TF_VAR_github_app_id=$${GITHUB_APP_ID:-}; \
+	export TF_VAR_github_app_installation_id=$${GITHUB_APP_INSTALLATION_ID:-}; \
+	export TF_VAR_github_app_private_key=$${GITHUB_APP_PRIVATE_KEY:-}; \
+	cd terraform/platform-gitops && terraform apply -auto-approve \
+		-target=kubernetes_secret.argocd_scm_token \
+		-target=kubectl_manifest.apps_project \
+		-target=kubectl_manifest.workloads_appset
+	@echo "✅ App platform components installed"
+	@echo "\nMonitor workload discovery:"
+	@echo "  kubectl get applications -n argocd -l platform.darede.io/workload=true -w"
+
+validate-app-platform: configure-kubectl ## Validate app platform (AppProject + ApplicationSet)
+	@echo "=== Checking AppProject ==="
+	kubectl get appproject apps -n argocd
+	@echo "\n=== Checking Workloads ApplicationSet ==="
+	kubectl get applicationset workloads -n argocd
+	@echo "\n=== Checking Discovered Workloads ==="
+	kubectl get applications -n argocd -l platform.darede.io/workload=true || echo "No workloads discovered yet"
+	@echo "\n✅ App platform validation complete"
 
 validate-backstage: ## Validate Backstage deps + build (deterministic)
 	@echo "==> Validating Backstage (yarn install --immutable + build)"
