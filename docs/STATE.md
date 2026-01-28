@@ -86,9 +86,235 @@ Includes:
 ## 🧠 CURRENT STATE
 
 **Repository:** id-platform (migrated from reference-implementation-aws on 2026-01-24)
-Phase: Phase 0 — Bootstrap
-Status: ✅ BACKSTAGE + ARGOCD SSO WORKING (GitOps healthy)
+Phase: Phase 2 — App Scaffolding & Deploy (IN PROGRESS)
+Status: ✅ FOUNDATION COMPLETE / 🚧 APP PLATFORM IMPLEMENTATION
 Branch: main
+
+---
+
+## 📋 PHASE 2 App Platform Status (2026-01-28)
+
+### ✅ ARCHITECTURE - 100% DYNAMIC CONFIGURATION
+
+**Principle**: Single Source of Truth → Zero Hardcoded Values
+
+```
+config/platform-params.yaml (committed)
+         ↓
+.env (gitignored, sensitive only)
+         ↓
+Terraform (platform-gitops)
+         ↓
+ConfigMap platform-params + Secrets
+         ↓
+Backstage + ArgoCD (env var substitution)
+```
+
+### ✅ COMPLETED COMPONENTS
+
+#### 1. Dynamic Configuration System
+- **File**: `config/platform-params.yaml` - Complete schema with GitHub config
+- **ConfigMap**: All values derived (ECR_REGISTRY, domains, ALB config, etc)
+- **Pattern**: `${ENV_VAR}` substitution everywhere (Backstage, templates, manifests)
+
+**Key Environment Variables (platform-params ConfigMap)**:
+```yaml
+DOMAIN, AWS_REGION, AWS_ACCOUNT_ID, CLUSTER_NAME
+BACKSTAGE_DOMAIN, ARGOCD_DOMAIN
+ALB_GROUP_NAME, ALB_SECURITY_GROUP_ID, ACM_CERTIFICATE_ARN
+GITHUB_ORG, GITHUB_APP_NAME, GITHUB_REPO_PREFIX, GITHUB_REPO_VISIBILITY, GITHUB_ACTIONS_ROLE_NAME
+ECR_REGISTRY, PLATFORM_REPO_URL, PLATFORM_REPO_BRANCH
+```
+
+#### 2. GitHub Integration (Dual Auth Strategy)
+- **Token Auth** (default): Uses `GITHUB_TOKEN` from `.env`
+- **GitHub App** (optional): Uses `GITHUB_APP_*` if configured
+- **Backstage**: Uses token auth by default (stable). GitHub App credentials remain supported in Terraform/Secrets for future enablement.
+- **ArgoCD**: SCM Provider uses GitHub App **or** token dynamically (based on `github.scmAuth` + presence of `GITHUB_APP_*`)
+- **Secret**: `backstage-github` contains both token + app credentials
+
+#### 3. ArgoCD AppProject for Workloads
+- **Terraform**: `terraform/platform-gitops/app-platform.tf` (`kubectl_manifest.apps_project`)
+- **Name**: `apps`
+- **Source Repos**: `https://github.com/matheusmaais/idp-*`
+- **Destinations**: Namespaces `idp-*`
+- **Resources**: Standard K8s + Ingress + HPA + ServiceMonitor
+- **RBAC**: Developer (view/sync) + Admin (full control)
+
+#### 4. ArgoCD ApplicationSet - Workload Auto-Discovery
+- **Terraform**: `terraform/platform-gitops/app-platform.tf` (`kubectl_manifest.workloads_appset`)
+- **Generator**: SCM Provider (GitHub org scan)
+- **Filter**: Repos matching `^idp-.*` with `k8s/` directory
+- **Auth**: GitHub App credentials (`github-app-credentials` secret)
+- **Behavior**: Creates 1 Application per discovered repo
+- **Namespace**: 1 namespace per app (`idp-<name>`)
+
+#### 5. Backstage Template - Node.js App
+- **Location**: `backstage-custom/templates/idp-nodejs-app/`
+- **Language**: Node.js + Express
+- **Features**:
+  - Structured JSON logging
+  - Prometheus metrics (`/metrics`)
+  - Health checks (`/health`, `/ready`)
+  - Graceful shutdown
+  - Non-root user (1001)
+  - Read-only root filesystem
+
+**Template Parameters** (from `environment.parameters`):
+```yaml
+githubOrg, repoPrefix, repoVisibility, domain
+albGroupName, albSecurityGroupId, acmCertificateArn
+ecrRegistry, awsRegion, awsAccountId, githubActionsRoleName, clusterName
+```
+
+#### 6. Application Skeleton
+**Files**:
+- `src/index.js` - Express app with observability
+- `package.json` - Dependencies (express, prom-client)
+- `Dockerfile` - Multi-stage, hardened, ARM64-compatible
+- `k8s/deployment.yaml` - Deployment with probes + resources
+- `k8s/service.yaml` - ClusterIP service
+- `k8s/ingress.yaml` - Conditional (if `exposePublic`)
+- `.github/workflows/ci.yml` - CI/CD pipeline
+- `catalog-info.yaml` - Backstage component metadata
+- `README.md` - Documentation
+
+#### 7. CI/CD Pipeline (GitHub Actions)
+- **Auth**: OIDC (no long-lived credentials)
+- **ECR**: Creates repo if not exists (idempotent)
+- **Build**: Multi-platform Docker build with cache
+- **Push**: Tags: `${sha}` + `latest`
+- **Deploy**: Updates `k8s/deployment.yaml` with new image tag
+- **Commit**: Pushes manifest update (`[skip ci]`)
+- **ArgoCD**: Auto-syncs on Git change
+
+#### 8. Ingress Strategy (Shared ALB)
+- **Group**: `${environment}-platform` (e.g., `dev-platform`)
+- **Order**: ArgoCD=100, Backstage=200, Apps=1000
+- **TLS**: ACM certificate (wildcard)
+- **DNS**: External-DNS creates Route53 records
+- **Security**: Shared SG from EKS module
+
+#### 9. Makefile Automation
+**New Targets**:
+```bash
+make install-app-platform    # Deploy AppProject + Workloads ApplicationSet
+make validate-app-platform   # Validate app platform components
+```
+
+### 🚧 PENDING TASKS
+
+1. **GitHub OIDC Provider for AWS** (manual, pre-requisite)
+   - Create OIDC provider: `token.actions.githubusercontent.com`
+   - IAM Role: `github-actions-ecr-push`
+   - Trust policy for `matheusmaais/*` repos
+   - Permissions: ECR push + create repo
+
+2. **Deploy App Platform Components**:
+   ```bash
+   make apply-gitops           # Update ConfigMap with new vars
+   make install-app-platform   # Deploy AppProject + ApplicationSet
+   make validate-app-platform  # Verify components
+   ```
+
+3. **Test End-to-End Flow**:
+   - Access Backstage: `https://backstage.timedevops.click`
+   - Create App via template (e.g., `hello`)
+   - Verify repo created: `matheusmaais/idp-hello`
+   - Watch CI pipeline execute
+   - Verify ArgoCD discovers app
+   - Check deployment: `kubectl get app idp-hello -n argocd`
+   - Test endpoint (if public): `https://hello.timedevops.click`
+
+### 📊 CONFIGURATION SCHEMA
+
+#### config/platform-params.yaml
+```yaml
+repository:
+  org: matheusmaais
+  name: id-platform
+  branch: main
+
+github:
+  org: matheusmaais
+  appName: daredelabs-idp-backstage
+  appRepoPrefix: "idp-"
+  appRepoVisibility: private
+  scmAuth: token  # token | app
+  actionsRoleName: github-actions-ecr-push
+
+infrastructure:
+  domain: timedevops.click
+  clusterName: platform-eks
+  awsRegion: us-east-1
+  awsProfile: darede
+  environment: dev
+
+identity:
+  cognitoAdminEmail: admin@timedevops.click
+  allowedEmailDomains: []
+```
+
+#### .env (sensitive, gitignored)
+```bash
+GITHUB_TOKEN=ghp_xxx
+COGNITO_ADMIN_TEMP_PASSWORD=xxx
+
+# Optional (if github.scmAuth=app)
+GITHUB_APP_ID=
+GITHUB_APP_INSTALLATION_ID=
+GITHUB_APP_PRIVATE_KEY=
+```
+
+### 🎯 VALIDATION COMMANDS
+
+```bash
+# 1. Verify Terraform ConfigMap
+kubectl get configmap platform-params -n argocd -o yaml | grep -E 'GITHUB|ECR'
+
+# 2. Verify Secrets
+kubectl get secret backstage-github -n backstage -o yaml
+
+# 3. Verify AppProject
+kubectl get appproject apps -n argocd
+
+# 4. Verify ApplicationSet
+kubectl get applicationset workloads -n argocd
+
+# 5. Monitor workload discovery
+kubectl get applications -n argocd -l platform.darede.io/workload=true -w
+
+# 6. Test Backstage template
+# UI → Create Component → Node.js App → Fill params → Create
+
+# 7. Verify auto-discovery
+kubectl get app idp-<name> -n argocd
+```
+
+### 📝 ARCHITECTURE DECISIONS
+
+**ADR-005: 100% Dynamic Configuration**
+- All values from `config/platform-params.yaml` or data sources
+- No hardcoded domains, orgs, ARNs, or IDs
+- Env var substitution: `${VAR}` pattern everywhere
+- Single edit point for org migration
+
+**ADR-006: Dual GitHub Auth Strategy**
+- Default: Token (simpler, works everywhere)
+- Optional: GitHub App (better security, rate limits)
+- Platform supports both simultaneously
+- ConfigMap flag: `GITHUB_SCM_AUTH=token|app`
+
+**ADR-007: One Namespace Per App**
+- Pattern: `idp-<app-name>` → namespace `idp-<app-name>`
+- Isolation + observability
+- AppProject restricts to `idp-*` namespaces
+
+**ADR-008: SCM Provider for Discovery**
+- ArgoCD scans GitHub org for `idp-*` repos
+- Requires `k8s/` directory (validation)
+- Auto-creates Application on discovery
+- Removes Application when repo deleted
 
 ---
 
@@ -343,6 +569,66 @@ Cons:
 ---
 
 ## 🔄 RECENT CHANGES (Latest First)
+
+### 2026-01-28: ArgoCD SSO quebrado por domínio Cognito “stale” (Dex cache) ✅
+**Status:** ✅ CORRIGIDO NO CLUSTER / ✅ PREVENÇÃO ADICIONADA NO CÓDIGO
+
+**Sintoma:**
+- ArgoCD redirecionava para um Hosted UI domain **antigo/inexistente** (ex.: `idp-poc-darede.auth.us-east-1.amazoncognito.com`) e o login não prosseguia.
+
+**Root cause (Causa raiz):**
+- O Cognito User Pool Domain foi alterado (ex.: agora `idp-dev-platform`), e o **Dex manteve em cache** o `authorization_endpoint` antigo do discovery OIDC.
+- Resultado: `/auth/login` → `/api/dex/auth/cognito` gerava URL para o domínio antigo, que não resolvia mais.
+
+**Fix (cluster):**
+- Reinício do Dex para recarregar OIDC discovery:
+```bash
+kubectl rollout restart deploy/argocd-dex-server -n argocd
+kubectl rollout status deploy/argocd-dex-server -n argocd --timeout=180s
+```
+
+**Validação:**
+```bash
+curl -sS -D- -o /dev/null https://argocd.<domain>/api/dex/auth/cognito | rg -i '^location:'
+# Esperado: Location aponta para https://idp-dev-platform.auth.<region>.amazoncognito.com/oauth2/authorize...
+```
+
+**Prevenção (IaC / dinâmico):**
+- Adicionado `dex.podAnnotations` em `terraform/platform-gitops/argocd.tf` com valor derivado de `local.cognito.oauth_domain_prefix`,
+  garantindo rollout automático do Dex quando o domínio Cognito mudar.
+
+### 2026-01-28: ArgoCD 404 ao clicar para login (deep-links tipo `/login`) ✅
+**Status:** ✅ ROOT CAUSE IDENTIFICADA / ✅ DOCUMENTADO (sem mudança estrutural)
+
+**Sintoma:**
+- Ao tentar autenticar no ArgoCD, o navegador cai em **HTTP 404**, geralmente quando abre paths como `https://argocd.<domain>/login`.
+
+**Evidência (reproduzível):**
+```bash
+curl -I https://argocd.<domain>/                 # 200 (UI entrypoint)
+curl -I https://argocd.<domain>/login            # 404 (deep-link não servido)
+curl -I https://argocd.<domain>/applications     # 404 (mesma classe de deep-link)
+
+# Endpoint correto para iniciar autenticação (SSO/Dex):
+curl -I https://argocd.<domain>/auth/login       # 303 → /api/dex/auth?... (OK)
+```
+
+**Root cause (Causa raiz):**
+- O `argocd-server` (v3.2.6) responde UI em `/` e expõe autenticação em `/auth/*` e `/api/*`,
+  mas **não atende deep-links** do UI via paths como `/login`, `/applications`, etc (retorna 404).
+- Portanto, qualquer link/redirect “na aplicação” que aponte para `.../login` vai falhar.
+
+**Correção / Mitigação (compatível com configuração dinâmica):**
+- Use como URL canônica **sempre**: `https://argocd.<domain>/` (sem path hardcoded).
+- Para login SSO: `https://argocd.<domain>/auth/login` (Dex → Cognito).
+- Onde houver link para ArgoCD (docs/templates/botões), garantir que ele use apenas `argocd.<domain>` derivado de
+  `config/platform-params.yaml` (não usar `/login`).
+
+**Validação (mínima, sem UI):**
+```bash
+curl -sS -D- -o /dev/null https://argocd.<domain>/auth/login | head -n 20
+# Esperado: HTTP 303 + Location: .../api/dex/auth?...
+```
 
 ### 2026-01-28: Backstage SSO stabilized end-to-end (no guest, no catalog users required) ✅
 **Status:** ✅ CLUSTER COMPLETE / ✅ GITOPS RECONCILED (ArgoCD `Synced/Healthy`)
