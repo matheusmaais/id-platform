@@ -87,11 +87,51 @@ Includes:
 
 **Repository:** darede-labs/idp-platform (migrated from matheusmaais/id-platform on 2026-01-28)
 Phase: Phase 2 — App Scaffolding & Deploy (IN PROGRESS)
-Status: ✅ CODE COMPLETE / ❌ BLOCKED (GitHub Org Required)
+Status: ✅ CODE COMPLETE / ✅ MIGRATION COMPLETE / ❌ BLOCKED (GitHub Org Required)
 Branch: main
 Last Updated: 2026-01-28 19:48 UTC
 
-**Migration Note:** Repository migrated to organization account. See [REPO-MIGRATION.md](REPO-MIGRATION.md) for details.
+### 🔄 Repository Migration (2026-01-28)
+
+**Reason:** Move to organization account (`darede-labs`) for proper ArgoCD SCM Provider support
+
+**Migration Summary:**
+- **From:** `matheusmaais/id-platform` (personal account)
+- **To:** `darede-labs/idp-platform` (organization account)
+- **Pre-Migration SHA:** `ab9d55db28fc53d10bc7ac1ec4e354ce4dce414f`
+- **Post-Migration SHA:** `8deafef` (includes migration commit + docs)
+
+**Changes Applied:**
+1. ✅ Created new repo in `darede-labs` org
+2. ✅ Updated 6 files with new repo references:
+   - `config/platform-params.yaml` (org, repo name, URLs)
+   - `argocd-apps/platform/backstage-appset.yaml` (Git generator repoURL)
+   - Documentation files (4 files)
+3. ✅ Applied Terraform changes (7 resources updated):
+   - `platform-apps` Application repoURL
+   - `apps` AppProject sourceRepos pattern
+   - `workloads` ApplicationSet organization
+   - ConfigMaps with GITHUB_ORG and PLATFORM_REPO_URL
+4. ✅ Updated ApplicationSet `platform-apps` (Git File generator)
+5. ✅ Recreated Backstage Application with new repo
+
+**Validation Results (Post-Migration):**
+```bash
+✅ ArgoCD: https://argocd.timedevops.click (HTTP 200)
+✅ Backstage: https://backstage.timedevops.click (HTTP 200)
+✅ Applications: backstage (Synced/Healthy), platform-apps (Synced/Healthy)
+✅ platform-apps repoURL: https://github.com/darede-labs/idp-platform
+✅ backstage sources[1].repoURL: https://github.com/darede-labs/idp-platform
+✅ workloads ApplicationSet organization: darede-labs
+✅ ConfigMap GITHUB_ORG: darede-labs
+```
+
+**Issues Resolved:**
+- Terraform state lock (force-unlocked)
+- ApplicationSet not auto-refreshing (manually applied updated manifest)
+- Backstage Application stale (deleted and recreated)
+
+**Full Details:** See [REPO-MIGRATION.md](REPO-MIGRATION.md)
 
 ---
 
