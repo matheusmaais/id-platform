@@ -16,11 +16,7 @@ backstage:
   image:
     registry: 948881762705.dkr.ecr.us-east-1.amazonaws.com
     repository: backstage-platform
-    tag: "20260127-160113"
-
-  # Override command to use our entrypoint script that extracts the bundle
-  command: ["/usr/local/bin/docker-entrypoint.sh", "node", "packages/backend"]
-  args: []
+    tag: "20260127-backstage-v1.47.1"
 
   # Inject environment variables from ConfigMaps
   extraEnvVarsCM:
