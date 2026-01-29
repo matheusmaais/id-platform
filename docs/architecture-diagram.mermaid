@@ -1,0 +1,141 @@
+%% IDP Platform - Complete Architecture Diagram
+%% This diagram shows the complete platform architecture including:
+%% - Network layers (Internet, VPC, EKS)
+%% - Control plane components (ArgoCD, Backstage)
+%% - Data plane (Applications, Databases)
+%% - AWS managed services (Cognito, Route53, ECR, etc)
+
+graph TB
+    %% External Layer
+    Internet((Internet<br/>Users & Developers))
+    GitHub[GitHub<br/>darede-labs org<br/>Code & Manifests]
+
+    %% AWS Managed Services
+    subgraph AWS_Services[AWS Managed Services]
+        Cognito[AWS Cognito<br/>User Pool<br/>OIDC Provider]
+        Route53[Route53<br/>timedevops.click<br/>Hosted Zone]
+        ECR[ECR Registry<br/>Container Images<br/>idp-*]
+        Secrets[Secrets Manager<br/>App Secrets]
+        S3[S3 Buckets<br/>App Data]
+    end
+
+    %% VPC Layer
+    subgraph VPC[AWS VPC - 10.0.0.0/16]
+        %% Public Subnet
+        subgraph PublicSubnet[Public Subnets - 3 AZs]
+            ALB[Application<br/>Load Balancer<br/>Shared dev-platform<br/>TLS Termination]
+            NAT[NAT Gateway<br/>Outbound Traffic]
+        end
+
+        %% Private Subnet
+        subgraph PrivateSubnet[Private Subnets - 3 AZs]
+            %% EKS Cluster
+            subgraph EKS[EKS Cluster - platform-eks - K8s 1.31]
+                %% Bootstrap Nodes
+                subgraph BootstrapNodes[Bootstrap Nodes]
+                    CoreDNS[CoreDNS<br/>Cluster DNS]
+                    LBController[AWS LB<br/>Controller<br/>v2.17.1]
+                    ExternalDNS[External-DNS<br/>v0.20.0<br/>Route53 Sync]
+                end
+
+                %% Karpenter Managed Nodes
+                subgraph KarpenterNodes[Karpenter-Managed Nodes<br/>Spot t4g ARM64]
+                    %% ArgoCD Namespace
+                    subgraph ArgoCDNS[Namespace: argocd]
+                        ArgoCDServer[ArgoCD Server<br/>Port 8080<br/>GitOps Engine]
+                        ArgoCDDex[Dex<br/>OIDC Proxy]
+                        ArgoCDController[ArgoCD<br/>Controller<br/>Sync Engine]
+                        AppSet[ApplicationSet<br/>Controller<br/>Auto-Discovery]
+                    end
+
+                    %% Backstage Namespace
+                    subgraph BackstageNS[Namespace: backstage]
+                        Backstage[Backstage<br/>Port 7007<br/>IDP Portal]
+                        PostgreSQL[(PostgreSQL<br/>Catalog DB)]
+                    end
+
+                    %% Karpenter System
+                    subgraph KarpenterNS[Namespace: karpenter]
+                        Karpenter[Karpenter<br/>Controller<br/>Auto-scaling]
+                    end
+
+                    %% User Apps
+                    subgraph UserApps[Namespaces: app1, app2, ...]
+                        App1[App Pod<br/>idp-myapp<br/>Port 3000]
+                        App2[App Pod<br/>idp-otherapp<br/>Port 8080]
+                    end
+                end
+            end
+
+            %% RDS
+            RDS[(RDS PostgreSQL<br/>App Databases<br/>Port 5432)]
+        end
+    end
+
+    %% Connections - Internet to ALB
+    Internet -->|HTTPS 443| ALB
+
+    %% Connections - ALB to Pods
+    ALB -->|HTTP 8080| ArgoCDServer
+    ALB -->|HTTP 7007| Backstage
+    ALB -->|HTTP 1024-65535| App1
+    ALB -->|HTTP 1024-65535| App2
+
+    %% Connections - Cognito Auth
+    ArgoCDServer -->|OIDC| Cognito
+    Backstage -->|OIDC| Cognito
+    ArgoCDServer <-->|Pre-Token<br/>Lambda| Cognito
+
+    %% Connections - External-DNS
+    ExternalDNS -->|ChangeResourceRecordSets| Route53
+    Route53 -.->|DNS Resolution| Internet
+
+    %% Connections - LB Controller
+    LBController -->|Create/Update ALB| ALB
+    LBController -->|DescribeSubnets<br/>DescribeSecurityGroups| AWS_Services
+
+    %% Connections - ArgoCD
+    ArgoCDController -->|Git Pull<br/>HTTPS| GitHub
+    ArgoCDServer <-->|RBAC Groups| ArgoCDDex
+    ArgoCDController -->|Apply Manifests| App1
+    ArgoCDController -->|Apply Manifests| App2
+    AppSet -->|SCM Provider<br/>Auto-Discovery| GitHub
+    AppSet -->|Create Applications| ArgoCDController
+
+    %% Connections - Backstage
+    Backstage -->|Read/Write| PostgreSQL
+    Backstage -->|Create Repo<br/>Push Code<br/>REST API| GitHub
+    Backstage -->|Register Component| Backstage
+
+    %% Connections - Karpenter
+    Karpenter -->|Watch Pending Pods| App1
+    Karpenter -->|RunInstances<br/>TerminateInstances| AWS_Services
+    Karpenter -->|Node Join| KarpenterNodes
+
+    %% Connections - Apps to AWS
+    App1 -->|PostgreSQL 5432| RDS
+    App1 -->|HTTPS 443| S3
+    App1 -->|HTTPS 443| Secrets
+    App2 -->|PostgreSQL 5432| RDS
+
+    %% Connections - Apps to Internet via NAT
+    App1 -->|Outbound<br/>HTTPS| NAT
+    NAT -->|HTTPS 443| Internet
+
+    %% Connections - CI/CD
+    GitHub -->|Webhook<br/>Push Event| GitHub
+    GitHub -.->|GitHub Actions<br/>Build & Push| ECR
+    ECR -.->|Pull Image| App1
+
+    %% Styling
+    classDef internet fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef aws fill:#ff9800,stroke:#e65100,stroke-width:2px
+    classDef controlplane fill:#c5e1a5,stroke:#33691e,stroke-width:2px
+    classDef dataplane fill:#b2dfdb,stroke:#004d40,stroke-width:2px
+    classDef storage fill:#f8bbd0,stroke:#880e4f,stroke-width:2px
+
+    class Internet internet
+    class Cognito,Route53,ECR,Secrets,S3 aws
+    class ArgoCDServer,ArgoCDController,AppSet,Backstage,LBController,ExternalDNS,Karpenter controlplane
+    class App1,App2 dataplane
+    class PostgreSQL,RDS storage
