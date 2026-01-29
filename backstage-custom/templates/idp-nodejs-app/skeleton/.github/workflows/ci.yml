@@ -10,7 +10,7 @@ env:
   AWS_REGION: ${{ values.awsRegion }}
   ECR_REGISTRY: ${{ values.ecrRegistry }}
   ECR_REPOSITORY: ${{ values.ciEcrRepoPrefix }}${{ values.name }}
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: {% raw %}${{ github.sha }}{% endraw %}
   MANIFESTS_PATH: ${{ values.manifestsPath }}
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ values.awsAccountId }}:role/${{ values.githubActionsRoleName }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: {% raw %}${{ env.AWS_REGION }}{% endraw %}
       
       - name: Login to Amazon ECR
         id: login-ecr
@@ -51,20 +51,20 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: {% raw %}${{ github.event_name != 'pull_request' }}{% endraw %}
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+            {% raw %}${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}{% endraw %}
+            {% raw %}${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest{% endraw %}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
       - name: Update Kubernetes manifest
-        if: github.event_name != 'pull_request'
+        if: {% raw %}github.event_name != 'pull_request'{% endraw %}
         run: |
           sed -i "s|image: .*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" "$MANIFESTS_PATH/deployment.yaml"
       
       - name: Commit updated manifest
-        if: github.event_name != 'pull_request'
+        if: {% raw %}github.event_name != 'pull_request'{% endraw %}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
