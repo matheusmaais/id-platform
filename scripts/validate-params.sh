@@ -91,6 +91,15 @@ CONFIG_REGION=$(yq eval '.infrastructure.awsRegion' config/platform-params.yaml 
 CONFIG_PROFILE=$(yq eval '.infrastructure.awsProfile' config/platform-params.yaml 2>/dev/null)
 CONFIG_EMAIL=$(yq eval '.identity.cognitoAdminEmail' config/platform-params.yaml 2>/dev/null)
 CONFIG_REPO=$(yq eval '.repository.url' config/platform-params.yaml 2>/dev/null)
+CONFIG_GH_ACTIONS_ROLE=$(yq eval '.github.actionsRoleName' config/platform-params.yaml 2>/dev/null)
+CONFIG_GH_REPO_REGEX=$(yq eval '.github.repoRegex' config/platform-params.yaml 2>/dev/null)
+CONFIG_APPS_PATH=$(yq eval '.apps.manifestsPath' config/platform-params.yaml 2>/dev/null)
+CONFIG_APPS_NS_STRATEGY=$(yq eval '.apps.namespace.strategy' config/platform-params.yaml 2>/dev/null)
+CONFIG_APPS_NS_TEMPLATE=$(yq eval '.apps.namespace.template' config/platform-params.yaml 2>/dev/null)
+CONFIG_ALB_SHARED_GROUP=$(yq eval '.alb.sharedGroupName' config/platform-params.yaml 2>/dev/null)
+CONFIG_CI_AUTH_MODE=$(yq eval '.ci.authMode' config/platform-params.yaml 2>/dev/null)
+CONFIG_CI_ECR_PREFIX=$(yq eval '.ci.ecrRepoPrefix' config/platform-params.yaml 2>/dev/null)
+CONFIG_CI_TAG_STRATEGY=$(yq eval '.ci.imageTagStrategy' config/platform-params.yaml 2>/dev/null)
 
 echo ""
 echo "1.1 Config required fields..."
@@ -113,6 +122,15 @@ check_cfg "infrastructure.awsRegion" "$CONFIG_REGION"
 check_cfg "infrastructure.awsProfile" "$CONFIG_PROFILE"
 check_cfg "identity.cognitoAdminEmail" "$CONFIG_EMAIL"
 check_cfg "repository.url" "$CONFIG_REPO"
+check_cfg "github.actionsRoleName" "$CONFIG_GH_ACTIONS_ROLE"
+check_cfg "github.repoRegex" "$CONFIG_GH_REPO_REGEX"
+check_cfg "apps.manifestsPath" "$CONFIG_APPS_PATH"
+check_cfg "apps.namespace.strategy" "$CONFIG_APPS_NS_STRATEGY"
+check_cfg "apps.namespace.template" "$CONFIG_APPS_NS_TEMPLATE"
+check_cfg "alb.sharedGroupName" "$CONFIG_ALB_SHARED_GROUP"
+check_cfg "ci.authMode" "$CONFIG_CI_AUTH_MODE"
+check_cfg "ci.ecrRepoPrefix" "$CONFIG_CI_ECR_PREFIX"
+check_cfg "ci.imageTagStrategy" "$CONFIG_CI_TAG_STRATEGY"
 if [ "${missing_cfg}" = "true" ]; then
   echo "   Fix config/platform-params.yaml and rerun."
   exit 1
@@ -126,6 +144,14 @@ if ! [[ "${CONFIG_EMAIL}" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; then
   exit 1
 fi
 echo "✅ Cognito admin email format valid"
+
+echo ""
+echo "1.3 CI auth mode..."
+if [ "$CONFIG_CI_AUTH_MODE" != "static-keys" ] && [ "$CONFIG_CI_AUTH_MODE" != "oidc" ]; then
+  echo "❌ Invalid ci.authMode: ${CONFIG_CI_AUTH_MODE} (expected: static-keys | oidc)"
+  exit 1
+fi
+echo "✅ CI auth mode valid"
 
 if [ -z "${SKIP_K8S_CHECKS}" ]; then
   # Check ConfigMap

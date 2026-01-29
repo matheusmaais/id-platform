@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ${{ values.name }}
-  namespace: ${{ values.repoPrefix }}${{ values.name }}
+  namespace: ${{ values.appNamespace }}
   labels:
     app: ${{ values.name }}
     app.kubernetes.io/name: ${{ values.name }}
@@ -11,14 +11,14 @@ metadata:
     # ALB Configuration - uses shared platform ALB
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/group.name: ${{ values.albGroupName }}
-    alb.ingress.kubernetes.io/group.order: "1000"
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.order: "20"
+    alb.ingress.kubernetes.io/scheme: ${{ values.albScheme }}
+    alb.ingress.kubernetes.io/target-type: ${{ values.albTargetType }}
     alb.ingress.kubernetes.io/backend-protocol: HTTP
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
     alb.ingress.kubernetes.io/certificate-arn: ${{ values.acmCertificateArn }}
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-path: /
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
     alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/security-groups: ${{ values.albSecurityGroupId }}

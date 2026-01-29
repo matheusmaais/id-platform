@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${{ values.name }}
-  namespace: ${{ values.repoPrefix }}${{ values.name }}
+  namespace: ${{ values.appNamespace }}
   labels:
     app: ${{ values.name }}
     app.kubernetes.io/name: ${{ values.name }}
@@ -30,7 +30,7 @@ spec:
         fsGroup: 1001
       containers:
         - name: app
-          image: ${{ values.ecrRegistry }}/${{ values.repoPrefix }}${{ values.name }}:latest
+          image: ${{ values.ecrRegistry }}/${{ values.ciEcrRepoPrefix }}${{ values.name }}:latest
           imagePullPolicy: Always
           ports:
             - name: http

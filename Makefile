@@ -1,7 +1,8 @@
 .PHONY: help init-all init-vpc init-eks init-addons init-gitops plan-all plan-vpc plan-eks plan-addons plan-gitops \
         apply-vpc apply-eks apply-addons apply-gitops destroy-addons destroy-eks destroy-vpc destroy-gitops destroy-cluster \
         configure-kubectl validate validate-gitops test-karpenter install destroy validate-env validate-params status \
-        validate-backstage build-backstage-image push-backstage-image
+        validate-backstage build-backstage-image push-backstage-image install-app-platform validate-app-platform destroy-app-platform \
+        validate-platform-params validate-argocd-discovery validate-new-app-flow test-new-app
 
 ENV_FILE ?= .env
 ENV_LOADER = set -a; [ -f "$(ENV_FILE)" ] && . "$(ENV_FILE)"; set +a
@@ -192,6 +193,35 @@ ifneq ($(filter validate-params,$(MAKECMDGOALS)),)
 	@echo "  [ ] validate-platform     (run: make validate-platform)"
 endif
 
+validate-platform-params: validate-params ## Validate central platform params
+
+validate-argocd-discovery: configure-kubectl ## Validate ArgoCD discovery components
+	@echo "=== Checking AppProject ==="
+	kubectl get appproject apps -n argocd
+	@echo "\n=== Checking Workloads ApplicationSet ==="
+	kubectl get applicationset workloads -n argocd
+	@echo "\n=== Checking Discovered Workloads ==="
+	kubectl get applications -n argocd -l platform.darede.io/workload=true || echo "No workloads discovered yet"
+	@echo "\n✅ ArgoCD discovery validation complete"
+
+validate-new-app-flow: configure-kubectl ## Validate app deployment (requires APP=<repo-name>)
+	@if [ -z "$(APP)" ]; then \
+		echo "❌ APP is required. Example: make validate-new-app-flow APP=idp-myapp1"; \
+		exit 1; \
+	fi
+	@APP_NS=$$(echo "$(APP)" | sed 's/^idp-//'); \
+	echo "=== Checking Application ($$APP) ==="; \
+	kubectl get application "$$APP" -n argocd; \
+	echo "\n=== Checking Namespace ($$APP_NS) ==="; \
+	kubectl get namespace "$$APP_NS"; \
+	echo "\n=== Checking Pods ($$APP_NS) ==="; \
+	kubectl get pods -n "$$APP_NS"; \
+	echo "\n=== Checking Ingress ($$APP_NS) ==="; \
+	kubectl get ingress -n "$$APP_NS" || echo "Ingress not created (exposePublic=false)"; \
+	echo "\n✅ App flow validation complete"
+
+test-new-app: validate-new-app-flow ## Alias for validate-new-app-flow (requires APP=<repo-name>)
+
 bootstrap-platform: validate-params configure-kubectl ## Create platform-apps ApplicationSet (validates params first)
 	@echo "=== Creating Platform ApplicationSet ==="
 	kubectl apply -f argocd-apps/platform/backstage-appset.yaml
@@ -261,6 +291,13 @@ validate-app-platform: configure-kubectl ## Validate app platform (AppProject + 
 	@echo "\n=== Checking Discovered Workloads ==="
 	kubectl get applications -n argocd -l platform.darede.io/workload=true || echo "No workloads discovered yet"
 	@echo "\n✅ App platform validation complete"
+
+destroy-app-platform: configure-kubectl ## Remove app platform (AppProject + ApplicationSet)
+	@echo "=== Removing Workloads ApplicationSet ==="
+	kubectl delete applicationset workloads -n argocd --ignore-not-found
+	@echo "=== Removing AppProject ==="
+	kubectl delete appproject apps -n argocd --ignore-not-found
+	@echo "\n✅ App platform components removed"
 
 validate-backstage: ## Validate Backstage deps + build (deterministic)
 	@echo "==> Validating Backstage (yarn install --immutable + build)"

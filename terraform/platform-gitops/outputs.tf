@@ -98,6 +98,11 @@ output "argocd_admin_credentials" {
   }
 }
 
+output "create_admin_user_command" {
+  description = "Command to fetch ArgoCD admin password"
+  value       = "kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d"
+}
+
 output "cognito_admin_credentials" {
   description = "Cognito Admin User Credentials (SSO Login)"
   value = {

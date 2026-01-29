@@ -9,13 +9,13 @@ on:
 env:
   AWS_REGION: ${{ values.awsRegion }}
   ECR_REGISTRY: ${{ values.ecrRegistry }}
-  ECR_REPOSITORY: ${{ values.repoPrefix }}${{ values.name }}
+  ECR_REPOSITORY: ${{ values.ciEcrRepoPrefix }}${{ values.name }}
   IMAGE_TAG: ${{ github.sha }}
+  MANIFESTS_PATH: ${{ values.manifestsPath }}
 
-# OIDC permissions for AWS
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -61,13 +61,13 @@ jobs:
       - name: Update Kubernetes manifest
         if: github.event_name != 'pull_request'
         run: |
-          sed -i "s|image: .*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" k8s/deployment.yaml
+          sed -i "s|image: .*|image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG|g" "$MANIFESTS_PATH/deployment.yaml"
       
       - name: Commit updated manifest
         if: github.event_name != 'pull_request'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/deployment.yaml
+          git add "$MANIFESTS_PATH/deployment.yaml"
           git diff --staged --quiet || git commit -m "chore: update image to $IMAGE_TAG [skip ci]"
           git push

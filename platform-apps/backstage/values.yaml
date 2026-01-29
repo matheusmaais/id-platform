@@ -72,17 +72,26 @@ backstage:
         parameters:
           githubOrg: ${GITHUB_ORG}
           repoPrefix: ${GITHUB_REPO_PREFIX}
+          repoRegex: ${GITHUB_REPO_REGEX}
           repoVisibility: ${GITHUB_REPO_VISIBILITY}
           githubAppName: ${GITHUB_APP_NAME}
           githubActionsRoleName: ${GITHUB_ACTIONS_ROLE_NAME}
           domain: ${DOMAIN}
-          albGroupName: ${ALB_GROUP_NAME}
+          albGroupName: ${ALB_SHARED_GROUP_NAME}
+          albScheme: ${ALB_SCHEME}
+          albTargetType: ${ALB_TARGET_TYPE}
           albSecurityGroupId: ${ALB_SECURITY_GROUP_ID}
           acmCertificateArn: ${ACM_CERTIFICATE_ARN}
           ecrRegistry: ${ECR_REGISTRY}
           awsRegion: ${AWS_REGION}
           awsAccountId: ${AWS_ACCOUNT_ID}
           clusterName: ${CLUSTER_NAME}
+          manifestsPath: ${APPS_MANIFESTS_PATH}
+          appNamespaceStrategy: ${APPS_NAMESPACE_STRATEGY}
+          appNamespaceTemplate: ${APPS_NAMESPACE_TEMPLATE}
+          ciAuthMode: ${CI_AUTH_MODE}
+          ciEcrRepoPrefix: ${CI_ECR_REPO_PREFIX}
+          ciImageTagStrategy: ${CI_IMAGE_TAG_STRATEGY}
     # Platform identity policy (read by backend auth resolver)
     identity:
       allowedEmailDomains: ${AUTH_ALLOWED_EMAIL_DOMAINS}
@@ -119,7 +128,7 @@ ingress:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/group.name: "" # Set via ApplicationSet from ConfigMap
-    alb.ingress.kubernetes.io/group.order: "200"
+    alb.ingress.kubernetes.io/group.order: "20"
     alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
     alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
@@ -139,6 +148,13 @@ postgresql:
     password: changeme-use-sealed-secrets
     database: backstage
   primary:
+    initdb:
+      scripts:
+        01-create-backstage-plugin-dbs.sql: |
+          CREATE DATABASE "backstage_plugin_catalog" OWNER "backstage";
+          CREATE DATABASE "backstage_plugin_search" OWNER "backstage";
+          CREATE DATABASE "backstage_plugin_auth" OWNER "backstage";
+          CREATE DATABASE "backstage_plugin_notifications" OWNER "backstage";
     persistence:
       enabled: false # Disable for Phase 0 (no EBS CSI IRSA yet)
     resources:

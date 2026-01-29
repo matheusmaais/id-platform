@@ -14,6 +14,7 @@ github:
   org: darede-labs
   appName: daredelabs-idp-backstage
   appRepoPrefix: "idp-"
+  repoRegex: "^idp-.*$"
   appRepoVisibility: private  # public | private
   scmAuth: token              # token | app (if app, requires GITHUB_APP_* in .env)
   actionsRoleName: github-actions-ecr-push # IAM Role name assumed by GitHub Actions (OIDC, manual prereq)
@@ -27,6 +28,22 @@ infrastructure:
   awsRegion: us-east-1
   awsProfile: darede  # Change to your AWS CLI profile name
   environment: dev
+
+apps:
+  manifestsPath: "deploy"
+  namespace:
+    strategy: "per-app"
+    template: "{{appName}}"
+
+alb:
+  sharedGroupName: "dev-platform"
+  scheme: "internet-facing"
+  targetType: "ip"
+
+ci:
+  authMode: "oidc" # static-keys | oidc
+  ecrRepoPrefix: "idp-"
+  imageTagStrategy: "sha"
 
 identity:
   cognitoAdminEmail: admin@timedevops.click

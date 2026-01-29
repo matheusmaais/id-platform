@@ -33,7 +33,7 @@ resource "kubectl_manifest" "apps_project" {
       destinations = [
         {
           server    = "https://kubernetes.default.svc"
-          namespace = "${local.github_repo_prefix}*"
+          namespace = "*"
         }
       ]
 
@@ -120,8 +120,8 @@ resource "kubectl_manifest" "workloads_appset" {
               )
               filters = [
                 {
-                  repositoryMatch = "^${local.github_repo_prefix}.*"
-                  pathsExist      = ["k8s"]
+                  repositoryMatch = local.github_repo_regex
+                  pathsExist      = [local.apps_manifests_path]
                 }
               ]
             }
@@ -146,11 +146,11 @@ resource "kubectl_manifest" "workloads_appset" {
             source = {
               repoURL        = "{{.url}}"
               targetRevision = "{{.branch}}"
-              path           = "k8s"
+              path           = local.apps_manifests_path
             }
             destination = {
               server    = "https://kubernetes.default.svc"
-              namespace = "{{.repository}}"
+              namespace = "{{ trimPrefix \"${local.github_repo_prefix}\" .repository }}"
             }
             syncPolicy = {
               automated = {

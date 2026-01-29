@@ -133,7 +133,7 @@ resource "helm_release" "argocd" {
             # ALB IngressGroup - shares ALB with other platform apps
             "kubernetes.io/ingress.class"           = "alb"
             "alb.ingress.kubernetes.io/group.name"  = local.shared_alb.group_name
-            "alb.ingress.kubernetes.io/group.order" = "100"
+            "alb.ingress.kubernetes.io/group.order" = "10"
 
             # ALB configuration
             "alb.ingress.kubernetes.io/scheme"               = "internet-facing"

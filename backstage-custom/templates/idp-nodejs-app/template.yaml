@@ -67,12 +67,16 @@ spec:
           owner: ${{ parameters.owner }}
           replicas: ${{ parameters.replicas }}
           exposePublic: ${{ parameters.exposePublic }}
+          appNamespace: ${{ parameters.name }}
           # From environment.parameters (platform-params ConfigMap)
           githubOrg: ${{ environment.parameters.githubOrg }}
           repoPrefix: ${{ environment.parameters.repoPrefix }}
+          repoRegex: ${{ environment.parameters.repoRegex }}
           repoVisibility: ${{ environment.parameters.repoVisibility }}
           domain: ${{ environment.parameters.domain }}
           albGroupName: ${{ environment.parameters.albGroupName }}
+          albScheme: ${{ environment.parameters.albScheme }}
+          albTargetType: ${{ environment.parameters.albTargetType }}
           albSecurityGroupId: ${{ environment.parameters.albSecurityGroupId }}
           acmCertificateArn: ${{ environment.parameters.acmCertificateArn }}
           ecrRegistry: ${{ environment.parameters.ecrRegistry }}
@@ -80,6 +84,12 @@ spec:
           awsAccountId: ${{ environment.parameters.awsAccountId }}
           githubActionsRoleName: ${{ environment.parameters.githubActionsRoleName }}
           clusterName: ${{ environment.parameters.clusterName }}
+          manifestsPath: ${{ environment.parameters.manifestsPath }}
+          appNamespaceStrategy: ${{ environment.parameters.appNamespaceStrategy }}
+          appNamespaceTemplate: ${{ environment.parameters.appNamespaceTemplate }}
+          ciAuthMode: ${{ environment.parameters.ciAuthMode }}
+          ciEcrRepoPrefix: ${{ environment.parameters.ciEcrRepoPrefix }}
+          ciImageTagStrategy: ${{ environment.parameters.ciImageTagStrategy }}
     
     # Step 2: Create GitHub repository
     - id: publish

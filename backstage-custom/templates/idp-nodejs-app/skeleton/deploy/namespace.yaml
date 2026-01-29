@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${{ values.appNamespace }}
+  labels:
+    app.kubernetes.io/name: ${{ values.name }}
+    platform.managed-by: argocd

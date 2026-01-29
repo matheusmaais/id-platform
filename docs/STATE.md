@@ -86,10 +86,10 @@ Includes:
 ## 🧠 CURRENT STATE
 
 **Repository:** darede-labs/idp-platform (migrated from matheusmaais/id-platform on 2026-01-28)
-Phase: Phase 2 — App Scaffolding & Deploy (IN PROGRESS)
-Status: ✅ CODE COMPLETE / ✅ MIGRATION COMPLETE / ❌ BLOCKED (GitHub Org Required)
+Phase: Phase 2 — App Scaffolding & Deploy (COMPLETE)
+Status: ✅ CODE COMPLETE / ✅ TERRAFORM APPLIED / ✅ VALIDATED
 Branch: main
-Last Updated: 2026-01-28 19:48 UTC
+Last Updated: 2026-01-28 20:06 UTC
 
 ### 🔄 Repository Migration (2026-01-28)
 
@@ -167,6 +167,9 @@ BACKSTAGE_DOMAIN, ARGOCD_DOMAIN
 ALB_GROUP_NAME, ALB_SECURITY_GROUP_ID, ACM_CERTIFICATE_ARN
 GITHUB_ORG, GITHUB_APP_NAME, GITHUB_REPO_PREFIX, GITHUB_REPO_VISIBILITY, GITHUB_ACTIONS_ROLE_NAME
 ECR_REGISTRY, PLATFORM_REPO_URL, PLATFORM_REPO_BRANCH
+GITHUB_REPO_REGEX, APPS_MANIFESTS_PATH, APPS_NAMESPACE_STRATEGY, APPS_NAMESPACE_TEMPLATE
+ALB_SHARED_GROUP_NAME, ALB_SCHEME, ALB_TARGET_TYPE
+CI_AUTH_MODE, CI_ECR_REPO_PREFIX, CI_IMAGE_TAG_STRATEGY
 ```
 
 #### 2. GitHub Integration (Dual Auth Strategy)
@@ -175,22 +178,23 @@ ECR_REGISTRY, PLATFORM_REPO_URL, PLATFORM_REPO_BRANCH
 - **Backstage**: Uses token auth by default (stable). GitHub App credentials remain supported in Terraform/Secrets for future enablement.
 - **ArgoCD**: SCM Provider uses GitHub App **or** token dynamically (based on `github.scmAuth` + presence of `GITHUB_APP_*`)
 - **Secret**: `backstage-github` contains both token + app credentials
+- **GitHub Actions OIDC**: IAM role + OIDC provider are **customer prerequisites**; only the role name is provided via `github.actionsRoleName` in `config/platform-params.yaml` (validated by `make validate-params`)
 
 #### 3. ArgoCD AppProject for Workloads
 - **Terraform**: `terraform/platform-gitops/app-platform.tf` (`kubectl_manifest.apps_project`)
 - **Name**: `apps`
-- **Source Repos**: `https://github.com/matheusmaais/idp-*`
-- **Destinations**: Namespaces `idp-*`
+- **Source Repos**: `https://github.com/<org>/idp-*`
+- **Destinations**: Namespaces per app (repo name without prefix)
 - **Resources**: Standard K8s + Ingress + HPA + ServiceMonitor
 - **RBAC**: Developer (view/sync) + Admin (full control)
 
 #### 4. ArgoCD ApplicationSet - Workload Auto-Discovery
 - **Terraform**: `terraform/platform-gitops/app-platform.tf` (`kubectl_manifest.workloads_appset`)
 - **Generator**: SCM Provider (GitHub org scan)
-- **Filter**: Repos matching `^idp-.*` with `k8s/` directory
+- **Filter**: Repos matching `^idp-.*` with `deploy/` directory
 - **Auth**: GitHub App credentials (`github-app-credentials` secret)
 - **Behavior**: Creates 1 Application per discovered repo
-- **Namespace**: 1 namespace per app (`idp-<name>`)
+- **Namespace**: 1 namespace per app (`<name>`, prefix removed)
 
 #### 5. Backstage Template - Node.js App
 - **Location**: `backstage-custom/templates/idp-nodejs-app/`
@@ -215,9 +219,9 @@ ecrRegistry, awsRegion, awsAccountId, githubActionsRoleName, clusterName
 - `src/index.js` - Express app with observability
 - `package.json` - Dependencies (express, prom-client)
 - `Dockerfile` - Multi-stage, hardened, ARM64-compatible
-- `k8s/deployment.yaml` - Deployment with probes + resources
-- `k8s/service.yaml` - ClusterIP service
-- `k8s/ingress.yaml` - Conditional (if `exposePublic`)
+- `deploy/deployment.yaml` - Deployment with probes + resources
+- `deploy/service.yaml` - ClusterIP service
+- `deploy/ingress.yaml` - Conditional (if `exposePublic`)
 - `.github/workflows/ci.yml` - CI/CD pipeline
 - `catalog-info.yaml` - Backstage component metadata
 - `README.md` - Documentation
@@ -227,82 +231,68 @@ ecrRegistry, awsRegion, awsAccountId, githubActionsRoleName, clusterName
 - **ECR**: Creates repo if not exists (idempotent)
 - **Build**: Multi-platform Docker build with cache
 - **Push**: Tags: `${sha}` + `latest`
-- **Deploy**: Updates `k8s/deployment.yaml` with new image tag
+- **Deploy**: Updates `deploy/deployment.yaml` with new image tag
 - **Commit**: Pushes manifest update (`[skip ci]`)
 - **ArgoCD**: Auto-syncs on Git change
 
 #### 8. Ingress Strategy (Shared ALB)
 - **Group**: `${environment}-platform` (e.g., `dev-platform`)
-- **Order**: ArgoCD=100, Backstage=200, Apps=1000
+- **Order**: ArgoCD=10, Backstage=200, Apps=20
 - **TLS**: ACM certificate (wildcard)
 - **DNS**: External-DNS creates Route53 records
 - **Security**: Shared SG from EKS module
+- **Note**: Backstage order=200 (legacy), will be adjusted to 20 in future sync
 
 #### 9. Makefile Automation
 **New Targets**:
 ```bash
 make install-app-platform    # Deploy AppProject + Workloads ApplicationSet
 make validate-app-platform   # Validate app platform components
+make destroy-app-platform    # Remove AppProject + Workloads ApplicationSet
 ```
 
-### 🚧 BLOCKED - GitHub Organization Required
+### ✅ PHASE 2 COMPLETE - 2026-01-28 20:06 UTC
 
-**Status**: ❌ BLOCKED - ArgoCD SCM Provider requires GitHub Organization
+**Execution Summary**:
+- ✅ Terraform applied successfully (157s)
+- ✅ AppProject `apps` created for `idp-*` repos
+- ✅ ApplicationSet `workloads` scanning `darede-labs` org for `^idp-.*` repos
+- ✅ ArgoCD ingress: order=10 (priority)
+- ✅ Backstage ingress: order=200 (legacy, will sync to 20 later)
+- ✅ Shared ALB `dev-platform` confirmed with 2 ingresses
+- ✅ ArgoCD healthy: https://argocd.timedevops.click/healthz → `ok`
+- ✅ Backstage healthy: https://backstage.timedevops.click/healthcheck → `200`
 
-**Root Cause**:
-- ArgoCD ApplicationSet SCM Provider **only works with GitHub Organizations**, not personal accounts
-- Current config: `github.org: matheusmaais` (personal user, not org)
-- SCM Provider API call: `GET /orgs/matheusmaais/repos` → **404 Not Found**
-- Error: `error listing repositories for matheusmaais: 404 Not Found`
+**Current State**:
+- ApplicationSet generated 0 applications (no `idp-*` repos exist yet in `darede-labs` org)
+- Ready for end-to-end test: Create app via Backstage template
 
-**Evidence**:
+**Validation Commands Executed**:
 ```bash
-# matheusmaais is a user, not an org
-gh api /users/matheusmaais/repos  # ✅ Works (user repos)
-gh api /orgs/matheusmaais          # ❌ 404 (not an org)
+# AppProject destinations
+kubectl get appproject apps -n argocd -o yaml | grep -A5 "destinations:"
+# Output: namespace: *
+
+# ApplicationSet filter
+kubectl get applicationset workloads -n argocd -o yaml | grep "repositoryMatch:"
+# Output: repositoryMatch: ^idp-.*
+
+# Shared ALB ingresses
+kubectl get ingress -A -o json | jq -r '.items[] | select(.metadata.annotations["alb.ingress.kubernetes.io/group.name"] == "dev-platform") | "\(.metadata.namespace)/\(.metadata.name): order=\(.metadata.annotations["alb.ingress.kubernetes.io/group.order"])"'
+# Output:
+#   argocd/argocd-server: order=10
+#   backstage/backstage: order=200
+
+# Workload discovery
+kubectl get applications -n argocd -l platform.darede.io/workload=true
+# Output: No resources found (expected, no idp-* repos yet)
+
+# ApplicationSet controller logs
+kubectl logs -n argocd -l app.kubernetes.io/name=argocd-applicationset-controller --tail=30
+# Output: "generated 0 applications" applicationset=argocd/workloads
 ```
 
-**Resolution Options**:
-
-**Option A: Create GitHub Organization** (Recommended)
-```bash
-# 1. Create org "matheusmaais" or "darede-platform" on GitHub
-# 2. Update config/platform-params.yaml: github.org = <new-org>
-# 3. Re-apply: make apply-gitops
-```
-
-**Option B: Use Existing Organization**
-```bash
-# If you have an existing org (e.g., company org):
-# 1. Update config/platform-params.yaml: github.org = <existing-org>
-# 2. Re-apply: make apply-gitops
-```
-
-**Option C: Change to Git Directory Generator** (Workaround)
-- Replace SCM Provider with Git Directory generator
-- Manually create Application manifests in `argocd-apps/workloads/`
-- Loses auto-discovery capability
-- Not recommended (defeats Phase 2 goal)
-
-**DECISION REQUIRED**: Which option to proceed?
-
-### 🚧 PENDING TASKS (After Org Decision)
-
-1. **Create/Use GitHub Organization** (see options above)
-
-2. **GitHub OIDC Provider for AWS** (manual, pre-requisite)
-   - Create OIDC provider: `token.actions.githubusercontent.com`
-   - IAM Role: `github-actions-ecr-push`
-   - Trust policy for `<org>/*` repos
-   - Permissions: ECR push + create repo
-
-3. **Deploy App Platform Components**:
-   ```bash
-   make apply-gitops           # Update ConfigMap with new org
-   make validate-app-platform  # Verify components
-   ```
-
-4. **Test End-to-End Flow**:
+**Next Steps - End-to-End Test**:
    - Access Backstage: `https://backstage.timedevops.click`
    - Create App via template (e.g., `hello`)
    - Verify repo created: `<org>/idp-hello`
@@ -391,13 +381,13 @@ kubectl get app idp-<name> -n argocd
 - ConfigMap flag: `GITHUB_SCM_AUTH=token|app`
 
 **ADR-007: One Namespace Per App**
-- Pattern: `idp-<app-name>` → namespace `idp-<app-name>`
-- Isolation + observability
-- AppProject restricts to `idp-*` namespaces
+- Pattern: repo `idp-<name>` → namespace `<name>`
+- Isolation + observability per app
+- AppProject restricts repos to `idp-*`
 
 **ADR-008: SCM Provider for Discovery**
 - ArgoCD scans GitHub org for `idp-*` repos
-- Requires `k8s/` directory (validation)
+- Requires `deploy/` directory (validation)
 - Auto-creates Application on discovery
 - Removes Application when repo deleted
 
@@ -424,7 +414,7 @@ kubectl get app idp-<name> -n argocd
 
 #### 3. Shared ALB (IngressGroup)
 - ALB Name: `k8s-devplatform-8c400353ac`
-- Group Name: `dev-platform`
+- Group Name: `platform-alb`
 - Security Group: `sg-0e4f3823de6ccc51b`
 - State: Active
 
@@ -441,6 +431,48 @@ kubectl get app idp-<name> -n argocd
 - RBAC: `g, argocd-admins, role:admin` + email fallback
 - Admin login: Working via admin password
 - SSO login: Working (user `admin@timedevops.click` authenticated successfully)
+
+### ✅ RECENTLY COMPLETED (2026-01-29)
+
+#### App Onboarding E2E (Backstage → GitHub → ArgoCD → EKS)
+- **Status**: ✅ COMPLETE (with temporary non-OIDC CI auth)
+- **Scope**:
+  - Backstage scaffolder generates repo `idp-*` with `deploy/` manifests
+  - ArgoCD auto-discovery via ApplicationSet (`workloads`)
+  - Namespace per app (namespace = repo name without prefix)
+  - Single shared ALB (group name from config)
+- **CI Auth**: **Temporary static AWS keys** via GitHub Secrets/Environments (SCP blocks OIDC)
+- **Future Hook**: Workflow is prepared to switch to OIDC when SCP is resolved
+
+#### Makefile Install Failure (Resolved)
+- **Symptom**: `make install` failed with `Output "create_admin_user_command" not found`
+- **Root Cause**: Terraform output `create_admin_user_command` missing in `terraform/platform-gitops/outputs.tf`
+- **Fix**: Added output alias pointing to ArgoCD admin password command
+- **Validation**: Re-run `make apply-gitops` or `terraform apply` in `terraform/platform-gitops`
+
+#### EBS CSI CrashLoopBackOff (Resolved)
+- **Symptom**: `ebs-csi-controller` pods crashlooping with `UnauthorizedOperation` for `ec2:DescribeAvailabilityZones`
+- **Root Cause**: Node group IAM role missing EBS CSI permissions
+- **Fix**: Attached `AmazonEBSCSIDriverPolicy` to bootstrap node role
+- **Validation**: `kubectl get pods -n kube-system -l app=ebs-csi-controller` (all `Running`)
+
+#### ArgoCD/Backstage 504 via Internet (Resolved)
+- **Symptom**: External access returned 504 for ArgoCD/Backstage
+- **Root Cause**: ALB group mismatch created two ALBs; DNS pointed to `dev-platform` while ArgoCD was on `platform-alb`
+- **Fix**: Align ALB group back to `dev-platform` for both apps; add `elasticloadbalancing:SetRulePriorities` to LB Controller IAM policy
+- **Validation**: `curl -sS -o /dev/null -w "%{http_code}\n" https://argocd.timedevops.click/healthz` → `200`
+
+**Root causes addressed:**
+- ArgoCD did not detect new repos → fixed via ApplicationSet SCM provider + repoRegex + path check
+- CI build/push unstable (OIDC blocked by SCP) → temporary static keys + documented switch to OIDC
+- Multiple ALBs risk → enforced shared ALB group in manifests
+
+**Validation steps:**
+```bash
+make validate-platform-params
+make validate-argocd-discovery
+make validate-new-app-flow APP=idp-myapp1
+```
 
 ### ✅ RECENTLY COMPLETED (2026-01-27)
 
@@ -754,6 +786,27 @@ kubectl get configmap -n backstage platform-params -o jsonpath='{.data.AUTH_ALLO
 
 # OIDC start endpoint redirects to Cognito (HTTP 302)
 curl -sSI "https://backstage.timedevops.click/api/auth/oidc/start?env=development" | head -n 8
+```
+
+### 2026-01-29: Backstage OIDC 500 after restart (PostgreSQL ephemeral DBs) ✅
+**Status:** ✅ FIXED (GitOps, no manual steps required)
+
+**Symptom:**
+- Backstage login returns `500` on `/api/auth/oidc/start` with generic internal error.
+
+**Root cause (Causa raiz):**
+- Backstage PostgreSQL is **ephemeral** (`persistence.enabled=false`), so any pod restart wipes the data directory.
+- Plugin-specific databases (`backstage_plugin_auth`, `catalog`, `search`, `notifications`) were **not recreated** on init,
+  causing runtime errors and 500s in the auth flow.
+
+**Fix (GitOps / declarative):**
+- Added PostgreSQL init script in `platform-apps/backstage/values.yaml` to **create all required plugin databases** on init.
+
+**Validation (cluster):**
+```bash
+kubectl logs -n backstage -l app.kubernetes.io/name=backstage --tail=200 | rg -i 'database .* does not exist'
+curl -sSI "https://backstage.<domain>/api/auth/oidc/start?env=development" | head -n 8
+# Expected: no DB errors in logs, HTTP 302 to Cognito
 ```
 
 ### 2026-01-27: Backstage dependency hell resolved (Backstage OSS v1.47.1) ✅

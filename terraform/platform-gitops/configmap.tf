@@ -48,6 +48,7 @@ resource "kubernetes_config_map" "platform_params" {
     GITHUB_ORG               = local.github_org
     GITHUB_APP_NAME          = local.github_app_name
     GITHUB_REPO_PREFIX       = local.github_repo_prefix
+    GITHUB_REPO_REGEX        = local.github_repo_regex
     GITHUB_REPO_VISIBILITY   = local.github_repo_visibility
     GITHUB_SCM_AUTH          = local.github_scm_auth
     GITHUB_ACTIONS_ROLE_NAME = local.github_actions_role_name
@@ -58,6 +59,17 @@ resource "kubernetes_config_map" "platform_params" {
 
     # ECR Configuration (derived)
     ECR_REGISTRY = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"
+
+    # App platform (Scaffolder + ArgoCD AppSet)
+    APPS_MANIFESTS_PATH      = local.apps_manifests_path
+    APPS_NAMESPACE_STRATEGY  = local.apps_namespace_strategy
+    APPS_NAMESPACE_TEMPLATE  = local.apps_namespace_template
+    ALB_SHARED_GROUP_NAME    = local.alb_shared_group_name
+    ALB_SCHEME               = local.alb_scheme
+    ALB_TARGET_TYPE          = local.alb_target_type
+    CI_AUTH_MODE             = local.ci_auth_mode
+    CI_ECR_REPO_PREFIX        = local.ci_ecr_repo_prefix
+    CI_IMAGE_TAG_STRATEGY    = local.ci_image_tag_strategy
   }
 
   depends_on = [

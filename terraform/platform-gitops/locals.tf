@@ -14,11 +14,21 @@ locals {
   github_repo_creds_url       = element(regexall("^https?://[^/]+", local.platform_repo_url), 0)
   github_org                  = local.platform_config.github.org
   github_repo_prefix          = local.platform_config.github.appRepoPrefix
+  github_repo_regex           = try(local.platform_config.github.repoRegex, "^${local.platform_config.github.appRepoPrefix}.*$")
   github_repo_visibility      = try(local.platform_config.github.appRepoVisibility, "private")
   github_scm_auth             = try(local.platform_config.github.scmAuth, "token")
   github_app_name             = try(local.platform_config.github.appName, "")
   github_actions_role_name    = try(local.platform_config.github.actionsRoleName, "github-actions-ecr-push")
   github_app_enabled          = var.github_app_id != null && var.github_app_installation_id != null && var.github_app_private_key != null
+  apps_manifests_path          = try(local.platform_config.apps.manifestsPath, "k8s")
+  apps_namespace_strategy      = try(local.platform_config.apps.namespace.strategy, "per-app")
+  apps_namespace_template      = try(local.platform_config.apps.namespace.template, "{{appName}}")
+  alb_shared_group_name        = try(local.platform_config.alb.sharedGroupName, local.platform_config.infrastructure.albGroupName)
+  alb_scheme                   = try(local.platform_config.alb.scheme, "internet-facing")
+  alb_target_type              = try(local.platform_config.alb.targetType, "ip")
+  ci_auth_mode                 = try(local.platform_config.ci.authMode, "static-keys")
+  ci_ecr_repo_prefix           = try(local.platform_config.ci.ecrRepoPrefix, local.platform_config.github.appRepoPrefix)
+  ci_image_tag_strategy        = try(local.platform_config.ci.imageTagStrategy, "sha")
   allowed_email_domains = distinct(concat(
     try(local.platform_config.identity.allowedEmailDomains, []),
     [local.domain, split("@", local.cognito_admin_email)[1]],
@@ -35,7 +45,7 @@ locals {
   # All platform apps share a single ALB to reduce costs
   # See: docs/ARCHITECTURE-DECISIONS.md ADR-001
   shared_alb = {
-    group_name        = "${local.environment}-platform"
+    group_name        = local.alb_shared_group_name
     security_group_id = data.terraform_remote_state.eks.outputs.platform_alb_security_group_id
   }
 
