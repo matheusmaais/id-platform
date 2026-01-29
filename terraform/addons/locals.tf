@@ -31,7 +31,7 @@ locals {
       os                  = ["linux"]
       capacity_type       = ["spot"]
       instance_category   = ["t"]
-      instance_generation = "4" # t4g
+      instance_generation = "3" # t4g (generation >= 4)
     }
     limits = {
       cpu    = "100"
