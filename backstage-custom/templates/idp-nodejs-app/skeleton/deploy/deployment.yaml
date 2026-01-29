@@ -28,6 +28,13 @@ spec:
         runAsNonRoot: true
         runAsUser: 1001
         fsGroup: 1001
+{% if values.arch == 'arm64' %}
+      nodeSelector:
+        ${{ values.schedulingArchLabelKey }}: ${{ values.schedulingArmValue }}
+{% elif values.arch == 'amd64' %}
+      nodeSelector:
+        ${{ values.schedulingArchLabelKey }}: ${{ values.schedulingAmdValue }}
+{% endif %}
       containers:
         - name: app
           image: ${{ values.ecrRegistry }}/${{ values.ciEcrRepoPrefix }}${{ values.name }}:latest

@@ -12,6 +12,7 @@ env:
   ECR_REPOSITORY: ${{ values.ciEcrRepoPrefix }}${{ values.name }}
   IMAGE_TAG: {% raw %}${{ github.sha }}{% endraw %}
   MANIFESTS_PATH: ${{ values.manifestsPath }}
+  PLATFORMS: {% if values.arch == 'arm64' %}${{ values.buildPlatformArm64 }}{% elif values.arch == 'amd64' %}${{ values.buildPlatformAmd64 }}{% else %}${{ values.buildPlatformMulti }}{% endif %}
 
 permissions:
   id-token: write
@@ -47,11 +48,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
+      - name: Validate build configuration
+        run: |
+          echo "Build platforms: $PLATFORMS"
+          docker buildx ls
+      
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/arm64
+          platforms: {% raw %}${{ env.PLATFORMS }}{% endraw %}
           push: {% raw %}${{ github.event_name != 'pull_request' }}{% endraw %}
           tags: |
             {% raw %}${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}{% endraw %}

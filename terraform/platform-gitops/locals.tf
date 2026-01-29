@@ -29,6 +29,13 @@ locals {
   ci_auth_mode                 = try(local.platform_config.ci.authMode, "static-keys")
   ci_ecr_repo_prefix           = try(local.platform_config.ci.ecrRepoPrefix, local.platform_config.github.appRepoPrefix)
   ci_image_tag_strategy        = try(local.platform_config.ci.imageTagStrategy, "sha")
+  app_default_arch             = try(local.platform_config.apps.defaults.arch, "arm64")
+  build_platform_arm64         = try(local.platform_config.ci.build.platforms.arm64, "linux/arm64")
+  build_platform_amd64         = try(local.platform_config.ci.build.platforms.amd64, "linux/amd64")
+  build_platform_multi         = try(local.platform_config.ci.build.platforms.multi, "linux/arm64,linux/amd64")
+  scheduling_arch_label_key    = try(local.platform_config.scheduling.archLabelKey, "kubernetes.io/arch")
+  scheduling_arm_value         = try(local.platform_config.scheduling.armValue, "arm64")
+  scheduling_amd_value         = try(local.platform_config.scheduling.amdValue, "amd64")
   allowed_email_domains = distinct(concat(
     try(local.platform_config.identity.allowedEmailDomains, []),
     [local.domain, split("@", local.cognito_admin_email)[1]],

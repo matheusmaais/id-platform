@@ -34,6 +34,8 @@ apps:
   namespace:
     strategy: "per-app"
     template: "{{appName}}"
+  defaults:
+    arch: "arm64"  # arm64|amd64|multi
 
 alb:
   sharedGroupName: "dev-platform"
@@ -44,6 +46,16 @@ ci:
   authMode: "oidc" # static-keys | oidc
   ecrRepoPrefix: "idp-"
   imageTagStrategy: "sha"
+  build:
+    platforms:
+      arm64: "linux/arm64"
+      amd64: "linux/amd64"
+      multi: "linux/arm64,linux/amd64"
+
+scheduling:
+  archLabelKey: "kubernetes.io/arch"
+  armValue: "arm64"
+  amdValue: "amd64"
 
 identity:
   cognitoAdminEmail: admin@timedevops.click

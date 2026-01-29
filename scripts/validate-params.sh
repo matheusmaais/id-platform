@@ -100,6 +100,13 @@ CONFIG_ALB_SHARED_GROUP=$(yq eval '.alb.sharedGroupName' config/platform-params.
 CONFIG_CI_AUTH_MODE=$(yq eval '.ci.authMode' config/platform-params.yaml 2>/dev/null)
 CONFIG_CI_ECR_PREFIX=$(yq eval '.ci.ecrRepoPrefix' config/platform-params.yaml 2>/dev/null)
 CONFIG_CI_TAG_STRATEGY=$(yq eval '.ci.imageTagStrategy' config/platform-params.yaml 2>/dev/null)
+CONFIG_APP_DEFAULT_ARCH=$(yq eval '.apps.defaults.arch' config/platform-params.yaml 2>/dev/null)
+CONFIG_BUILD_PLATFORM_ARM64=$(yq eval '.ci.build.platforms.arm64' config/platform-params.yaml 2>/dev/null)
+CONFIG_BUILD_PLATFORM_AMD64=$(yq eval '.ci.build.platforms.amd64' config/platform-params.yaml 2>/dev/null)
+CONFIG_BUILD_PLATFORM_MULTI=$(yq eval '.ci.build.platforms.multi' config/platform-params.yaml 2>/dev/null)
+CONFIG_SCHED_ARCH_LABEL=$(yq eval '.scheduling.archLabelKey' config/platform-params.yaml 2>/dev/null)
+CONFIG_SCHED_ARM_VALUE=$(yq eval '.scheduling.armValue' config/platform-params.yaml 2>/dev/null)
+CONFIG_SCHED_AMD_VALUE=$(yq eval '.scheduling.amdValue' config/platform-params.yaml 2>/dev/null)
 
 echo ""
 echo "1.1 Config required fields..."
@@ -131,10 +138,27 @@ check_cfg "alb.sharedGroupName" "$CONFIG_ALB_SHARED_GROUP"
 check_cfg "ci.authMode" "$CONFIG_CI_AUTH_MODE"
 check_cfg "ci.ecrRepoPrefix" "$CONFIG_CI_ECR_PREFIX"
 check_cfg "ci.imageTagStrategy" "$CONFIG_CI_TAG_STRATEGY"
+check_cfg "apps.defaults.arch" "$CONFIG_APP_DEFAULT_ARCH"
+check_cfg "ci.build.platforms.arm64" "$CONFIG_BUILD_PLATFORM_ARM64"
+check_cfg "ci.build.platforms.amd64" "$CONFIG_BUILD_PLATFORM_AMD64"
+check_cfg "ci.build.platforms.multi" "$CONFIG_BUILD_PLATFORM_MULTI"
+check_cfg "scheduling.archLabelKey" "$CONFIG_SCHED_ARCH_LABEL"
+check_cfg "scheduling.armValue" "$CONFIG_SCHED_ARM_VALUE"
+check_cfg "scheduling.amdValue" "$CONFIG_SCHED_AMD_VALUE"
 if [ "${missing_cfg}" = "true" ]; then
   echo "   Fix config/platform-params.yaml and rerun."
   exit 1
 fi
+
+# Validate arch value
+echo ""
+echo "1.3 App defaults architecture..."
+if [ "$CONFIG_APP_DEFAULT_ARCH" != "arm64" ] && [ "$CONFIG_APP_DEFAULT_ARCH" != "amd64" ] && [ "$CONFIG_APP_DEFAULT_ARCH" != "multi" ]; then
+  echo "❌ apps.defaults.arch must be one of: arm64, amd64, multi"
+  echo "   Current value: $CONFIG_APP_DEFAULT_ARCH"
+  exit 1
+fi
+echo "✅ apps.defaults.arch = $CONFIG_APP_DEFAULT_ARCH"
 
 # Validate email from config
 echo ""

@@ -39,6 +39,19 @@ spec:
     
     - title: Deployment Configuration
       properties:
+        arch:
+          title: Architecture
+          type: string
+          description: Target CPU architecture for container builds
+          enum:
+            - arm64
+            - amd64
+            - multi
+          enumNames:
+            - 'ARM64 (Graviton, recommended)'
+            - 'AMD64 (x86_64)'
+            - 'Multi-arch (both ARM64 and AMD64)'
+          default: arm64
         exposePublic:
           title: Expose Publicly
           type: boolean
@@ -56,6 +69,7 @@ spec:
           name: ${{ parameters.name }}
           description: ${{ parameters.description }}
           owner: ${{ parameters.owner }}
+          arch: ${{ parameters.arch }}
           exposePublic: ${{ parameters.exposePublic }}
           appNamespace: ${{ parameters.name }}
           # From environment.parameters (platform-params ConfigMap)
@@ -80,6 +94,13 @@ spec:
           ciAuthMode: ${{ environment.parameters.ciAuthMode }}
           ciEcrRepoPrefix: ${{ environment.parameters.ciEcrRepoPrefix }}
           ciImageTagStrategy: ${{ environment.parameters.ciImageTagStrategy }}
+          appDefaultArch: ${{ environment.parameters.appDefaultArch }}
+          buildPlatformArm64: ${{ environment.parameters.buildPlatformArm64 }}
+          buildPlatformAmd64: ${{ environment.parameters.buildPlatformAmd64 }}
+          buildPlatformMulti: ${{ environment.parameters.buildPlatformMulti }}
+          schedulingArchLabelKey: ${{ environment.parameters.schedulingArchLabelKey }}
+          schedulingArmValue: ${{ environment.parameters.schedulingArmValue }}
+          schedulingAmdValue: ${{ environment.parameters.schedulingAmdValue }}
     
     # Step 2: Create GitHub repository
     - id: publish

@@ -92,6 +92,13 @@ backstage:
           ciAuthMode: ${CI_AUTH_MODE}
           ciEcrRepoPrefix: ${CI_ECR_REPO_PREFIX}
           ciImageTagStrategy: ${CI_IMAGE_TAG_STRATEGY}
+          appDefaultArch: ${APPS_DEFAULT_ARCH}
+          buildPlatformArm64: ${BUILD_PLATFORM_ARM64}
+          buildPlatformAmd64: ${BUILD_PLATFORM_AMD64}
+          buildPlatformMulti: ${BUILD_PLATFORM_MULTI}
+          schedulingArchLabelKey: ${SCHEDULING_ARCH_LABEL_KEY}
+          schedulingArmValue: ${SCHEDULING_ARM_VALUE}
+          schedulingAmdValue: ${SCHEDULING_AMD_VALUE}
     # Platform identity policy (read by backend auth resolver)
     identity:
       allowedEmailDomains: ${AUTH_ALLOWED_EMAIL_DOMAINS}
