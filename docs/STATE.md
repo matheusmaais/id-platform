@@ -688,7 +688,7 @@ Cons:
 ## 🔄 RECENT CHANGES (Latest First)
 
 ### 2026-01-29: Backstage Kubernetes plugin habilitado para logs ✅
-**Status:** ✅ CODE COMPLETE / ⚠️ VALIDAÇÃO PENDENTE (aguardando ArgoCD sync)
+**Status:** ✅ CODE COMPLETE / ✅ VALIDADO EM CLUSTER
 
 **O que foi feito:**
 - Adicionado bloco `kubernetes:` no app-config do Backstage (in-cluster config)
@@ -701,10 +701,15 @@ Cons:
 - `platform-apps/backstage/rbac-kubernetes.yaml`
 - `argocd-apps/platform/backstage-appset.yaml` (aplicar RBAC como source separado)
 
-**Validação (após sync):**
+**Validação (cluster):**
 ```bash
 kubectl auth can-i list pods --as=system:serviceaccount:backstage:backstage -A
 kubectl auth can-i get pods/log --as=system:serviceaccount:backstage:backstage -n <app-namespace>
+```
+
+**Refresh aplicado:**
+```bash
+kubectl -n argocd annotate application platform-apps argocd.argoproj.io/refresh=hard --overwrite
 ```
 
 **UI:**
