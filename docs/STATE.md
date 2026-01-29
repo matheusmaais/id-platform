@@ -848,6 +848,13 @@ curl -sL "https://raw.githubusercontent.com/darede-labs/idp-platform/main/backst
 
 **Next:** Create test app via Backstage with each arch option and validate CI builds + deployments
 
+**Incident - Karpenter NodePool misconfiguration (2026-01-29 16:36 UTC):**
+**Symptom:** All pods cluster-wide in Pending state, Karpenter unable to provision nodes
+**Root cause:** Changed `instance_generation` from "3" to "4" with `Gt` operator, which means "> 4" (generation 5+), filtering out all t-family instances
+**Fix:** Patched NodePool to use `instance_generation: "3"` (Gt 3 means >= 4, matching t4g)
+**Impact:** ~3 minutes downtime for new pods, Karpenter provisioned 3 new nodes to recover
+**Prevention:** Added validation comment in locals.tf explaining Gt operator behavior
+
 ### 2026-01-27: Backstage dependency hell resolved (Backstage OSS v1.47.1) ✅
 **Status:** ✅ LOCAL COMPLETE / 🚧 READY FOR CLUSTER DEPLOY (image push + ArgoCD sync pending)
 
