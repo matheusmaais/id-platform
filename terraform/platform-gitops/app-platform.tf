@@ -28,6 +28,7 @@ resource "kubectl_manifest" "apps_project" {
 
       sourceRepos = [
         "https://github.com/${local.github_org}/${local.github_repo_prefix}*",
+        "git@github.com:${local.github_org}/${local.github_repo_prefix}*",
       ]
 
       destinations = [
@@ -106,8 +107,9 @@ resource "kubectl_manifest" "workloads_appset" {
             scmProvider = {
               github = merge(
                 {
-                  organization = local.github_org
-                  allBranches  = false
+                  organization  = local.github_org
+                  allBranches   = false
+                  cloneProtocol = "https"
                 },
                 local.github_app_enabled ? {
                   appSecretName = kubernetes_secret.argocd_github_app_creds[0].metadata[0].name
@@ -144,7 +146,7 @@ resource "kubectl_manifest" "workloads_appset" {
           spec = {
             project = "apps"
             source = {
-              repoURL        = "{{.url}}"
+              repoURL        = "https://github.com/${local.github_org}/{{.repository}}.git"
               targetRevision = "{{.branch}}"
               path           = local.apps_manifests_path
             }
