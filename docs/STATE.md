@@ -809,6 +809,45 @@ curl -sSI "https://backstage.<domain>/api/auth/oidc/start?env=development" | hea
 # Expected: no DB errors in logs, HTTP 302 to Cognito
 ```
 
+### 2026-01-29: Multi-arch support implementation (arm64/amd64/multi) 🚧
+**Status:** 🚧 IN PROGRESS - FASE 1 COMPLETE
+
+**Goal:**
+- Enable architecture selection (arm64/amd64/multi) when creating apps via Backstage
+- Build Docker images for the selected architecture
+- Ensure proper pod scheduling via nodeSelector
+- No hardcoded values, all via platform-params.yaml
+
+**FASE 1 - PARAMS + TEMPLATE (COMPLETE):**
+
+**Changes:**
+1. **platform-params.yaml**:
+   - Added `apps.defaults.arch: "arm64"` (default for cluster)
+   - Added `ci.build.platforms` map (arm64/amd64/multi)
+   - Added `scheduling` section (archLabelKey, armValue, amdValue)
+
+2. **Backstage template**:
+   - Added architecture selection dropdown (arm64/amd64/multi)
+   - Generates `platform.yaml` in each app with arch config
+   - CI workflow uses dynamic `PLATFORMS` env var based on selection
+   - Deployment manifest applies nodeSelector for single-arch builds
+
+3. **Validation script**:
+   - Added checks for all new arch-related fields
+
+**Validation (FASE 1):**
+```bash
+# ConfigMap updated
+kubectl get cm platform-params -n backstage -o jsonpath='{.data.APPS_DEFAULT_ARCH}'
+# Expected: arm64
+
+# Template available
+curl -sL "https://raw.githubusercontent.com/darede-labs/idp-platform/main/backstage-custom/templates/idp-nodejs-app/template.yaml" | grep -A 5 "title: Architecture"
+# Expected: enum with arm64/amd64/multi
+```
+
+**Next:** Create test app via Backstage with each arch option and validate CI builds + deployments
+
 ### 2026-01-27: Backstage dependency hell resolved (Backstage OSS v1.47.1) ✅
 **Status:** ✅ LOCAL COMPLETE / 🚧 READY FOR CLUSTER DEPLOY (image push + ArgoCD sync pending)
 
