@@ -6,6 +6,8 @@ metadata:
   annotations:
     github.com/project-slug: ${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}
     backstage.io/kubernetes-id: ${{ values.name }}
+    backstage.io/kubernetes-namespace: ${{ values.appNamespace }}
+    backstage.io/kubernetes-label-selector: app.kubernetes.io/name=${{ values.name }}
     argocd/app-name: ${{ values.repoPrefix }}${{ values.name }}
   links:
     - url: https://github.com/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}

@@ -687,6 +687,29 @@ Cons:
 
 ## 🔄 RECENT CHANGES (Latest First)
 
+### 2026-01-29: Backstage Kubernetes plugin habilitado para logs ✅
+**Status:** ✅ CODE COMPLETE / ⚠️ VALIDAÇÃO PENDENTE (aguardando ArgoCD sync)
+
+**O que foi feito:**
+- Adicionado bloco `kubernetes:` no app-config do Backstage (in-cluster config)
+- Template de apps agora publica annotations de namespace e label selector
+- Criado RBAC global (ClusterRole/Binding) para leitura de pods/logs pelo SA do Backstage
+
+**Arquivos alterados:**
+- `platform-apps/backstage/values.yaml`
+- `backstage-custom/templates/idp-nodejs-app/skeleton/catalog-info.yaml`
+- `platform-apps/backstage/rbac-kubernetes.yaml`
+- `argocd-apps/platform/backstage-appset.yaml` (aplicar RBAC como source separado)
+
+**Validação (após sync):**
+```bash
+kubectl auth can-i list pods --as=system:serviceaccount:backstage:backstage -A
+kubectl auth can-i get pods/log --as=system:serviceaccount:backstage:backstage -n <app-namespace>
+```
+
+**UI:**
+- Backstage → Component → Aba "Kubernetes" → Ver pods e logs
+
 ### 2026-01-28: ArgoCD SSO quebrado por domínio Cognito “stale” (Dex cache) ✅
 **Status:** ✅ CORRIGIDO NO CLUSTER / ✅ PREVENÇÃO ADICIONADA NO CÓDIGO
 

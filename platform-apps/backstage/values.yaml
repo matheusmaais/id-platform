@@ -102,6 +102,18 @@ backstage:
     # Platform identity policy (read by backend auth resolver)
     identity:
       allowedEmailDomains: ${AUTH_ALLOWED_EMAIL_DOMAINS}
+    # Kubernetes plugin (in-cluster access)
+    kubernetes:
+      serviceLocatorMethod:
+        type: 'multiTenant'
+      clusterLocatorMethods:
+        - type: 'config'
+          clusters:
+            - url: https://kubernetes.default.svc
+              name: ${CLUSTER_NAME}
+              authProvider: serviceAccount
+              skipTLSVerify: true
+              skipMetricsLookup: true
     # Catalog configuration
     catalog:
       rules:
@@ -121,6 +133,9 @@ backstage:
     limits:
       cpu: 1000m
       memory: 1Gi
+serviceAccount:
+  create: true
+  name: backstage
 # Ingress with shared ALB
 # Note: ingress.host is set via ArgoCD ApplicationSet parameter
 # Ingress configuration

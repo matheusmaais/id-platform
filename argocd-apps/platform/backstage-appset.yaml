@@ -72,6 +72,13 @@ spec:
         - repoURL: '{{.repository.url}}'
           targetRevision: '{{.repository.branch}}'
           ref: values
+        # RBAC manifests for Backstage (non-Helm)
+        - repoURL: '{{.repository.url}}'
+          targetRevision: '{{.repository.branch}}'
+          path: platform-apps/backstage
+          directory:
+            recurse: false
+            exclude: values.yaml
       
       destination:
         server: https://kubernetes.default.svc
