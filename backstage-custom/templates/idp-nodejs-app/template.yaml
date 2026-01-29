@@ -108,6 +108,6 @@ spec:
         icon: catalog
         entityRef: ${{ steps['register'].output.entityRef }}
       - title: CI Pipeline
-        url: ${{ steps['publish'].output.remoteUrl }}/actions
+        url: https://github.com/${{ environment.parameters.githubOrg }}/${{ environment.parameters.repoPrefix }}${{ parameters.name }}/actions
       - title: ArgoCD Application
         url: https://argocd.${{ environment.parameters.domain }}/applications/${{ environment.parameters.repoPrefix }}${{ parameters.name }}
