@@ -38,16 +38,7 @@ spec:
               kind: [User, Group]
     
     - title: Deployment Configuration
-      required:
-        - replicas
       properties:
-        replicas:
-          title: Replicas
-          type: integer
-          description: Number of replicas to run
-          default: 2
-          minimum: 1
-          maximum: 10
         exposePublic:
           title: Expose Publicly
           type: boolean
@@ -65,7 +56,6 @@ spec:
           name: ${{ parameters.name }}
           description: ${{ parameters.description }}
           owner: ${{ parameters.owner }}
-          replicas: ${{ parameters.replicas }}
           exposePublic: ${{ parameters.exposePublic }}
           appNamespace: ${{ parameters.name }}
           # From environment.parameters (platform-params ConfigMap)

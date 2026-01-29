@@ -50,8 +50,6 @@ The CI/CD pipeline runs automatically on every push to `main`:
 {% endif %}
 
 ### Configuration
-
-- **Replicas**: ${{ values.replicas }}
 {% if values.exposePublic %}
 - **Public Access**: Yes (https://${{ values.name }}.${{ values.domain }})
 {% else %}

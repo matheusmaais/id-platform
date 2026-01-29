@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/part-of: ${{ values.repoPrefix }}${{ values.name }}
     app.kubernetes.io/managed-by: argocd
 spec:
-  replicas: ${{ values.replicas }}
+  replicas: 1
   selector:
     matchLabels:
       app: ${{ values.name }}
