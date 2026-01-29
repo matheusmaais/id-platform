@@ -1,4 +1,17 @@
 ################################################################################
+# Karpenter Configuration
+# 
+# Architecture Support:
+# - ARM64 (Graviton): ENABLED by default (t4g instances, cost-optimized)
+# - AMD64 (x86_64): COMMENTED OUT (t3 instances)
+#
+# To enable AMD64 workloads:
+# 1. Uncomment resources: karpenter_node_class_amd64 and karpenter_node_pool_amd64
+# 2. Run: make apply-addons
+# 3. Verify: kubectl get ec2nodeclass,nodepool
+################################################################################
+
+################################################################################
 # Karpenter Helm Chart
 ################################################################################
 
@@ -60,24 +73,24 @@ resource "helm_release" "karpenter" {
 }
 
 ################################################################################
-# Karpenter EC2NodeClass
-# Defines the EC2 configuration for nodes
+# Karpenter EC2NodeClass - ARM64 (Graviton)
+# Defines the EC2 configuration for ARM64 nodes
 ################################################################################
 
-resource "kubectl_manifest" "karpenter_node_class" {
+resource "kubectl_manifest" "karpenter_node_class_arm64" {
   depends_on = [helm_release.karpenter]
 
   yaml_body = yamlencode({
     apiVersion = "karpenter.k8s.aws/v1"
     kind       = "EC2NodeClass"
     metadata = {
-      name = local.node_class.name
+      name = local.node_class_arm64.name
     }
     spec = {
       # AMI Selection - AL2023 ARM64 optimized
-      amiFamily = local.node_class.ami_family
+      amiFamily = local.node_class_arm64.ami_family
       amiSelectorTerms = [{
-        alias = local.node_class.ami_alias
+        alias = local.node_class_arm64.ami_alias
       }]
 
       # Subnet selection - use private subnets with Karpenter tag
@@ -101,7 +114,7 @@ resource "kubectl_manifest" "karpenter_node_class" {
       blockDeviceMappings = [{
         deviceName = "/dev/xvda"
         ebs = {
-          volumeSize          = local.node_class.disk_size
+          volumeSize          = local.node_class_arm64.disk_size
           volumeType          = "gp3"
           encrypted           = true
           deleteOnTermination = true
@@ -129,18 +142,18 @@ resource "kubectl_manifest" "karpenter_node_class" {
 }
 
 ################################################################################
-# Karpenter NodePool
-# Defines when and how to provision nodes
+# Karpenter NodePool - ARM64 (Graviton, default)
+# Defines when and how to provision ARM64 nodes
 ################################################################################
 
-resource "kubectl_manifest" "karpenter_node_pool" {
-  depends_on = [kubectl_manifest.karpenter_node_class]
+resource "kubectl_manifest" "karpenter_node_pool_arm64" {
+  depends_on = [kubectl_manifest.karpenter_node_class_arm64]
 
   yaml_body = yamlencode({
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
     metadata = {
-      name = local.node_pool.name
+      name = local.node_pool_arm64.name
     }
     spec = {
       # Template for nodes
@@ -154,7 +167,7 @@ resource "kubectl_manifest" "karpenter_node_pool" {
           nodeClassRef = {
             group = "karpenter.k8s.aws"
             kind  = "EC2NodeClass"
-            name  = local.node_class.name
+            name  = local.node_class_arm64.name
           }
 
           # Requirements - what kinds of nodes can be created
@@ -162,27 +175,27 @@ resource "kubectl_manifest" "karpenter_node_pool" {
             {
               key      = "kubernetes.io/arch"
               operator = "In"
-              values   = local.node_pool.requirements.arch
+              values   = local.node_pool_arm64.requirements.arch
             },
             {
               key      = "kubernetes.io/os"
               operator = "In"
-              values   = local.node_pool.requirements.os
+              values   = local.node_pool_arm64.requirements.os
             },
             {
               key      = "karpenter.sh/capacity-type"
               operator = "In"
-              values   = local.node_pool.requirements.capacity_type
+              values   = local.node_pool_arm64.requirements.capacity_type
             },
             {
               key      = "karpenter.k8s.aws/instance-category"
               operator = "In"
-              values   = local.node_pool.requirements.instance_category
+              values   = local.node_pool_arm64.requirements.instance_category
             },
             {
               key      = "karpenter.k8s.aws/instance-generation"
               operator = "Gt"
-              values   = [local.node_pool.requirements.instance_generation]
+              values   = [local.node_pool_arm64.requirements.instance_generation]
             }
           ]
         }
@@ -190,23 +203,171 @@ resource "kubectl_manifest" "karpenter_node_pool" {
 
       # Limits - prevent runaway scaling
       limits = {
-        cpu    = local.node_pool.limits.cpu
-        memory = local.node_pool.limits.memory
+        cpu    = local.node_pool_arm64.limits.cpu
+        memory = local.node_pool_arm64.limits.memory
       }
 
       # Disruption budget
       disruption = {
-        consolidationPolicy = local.node_pool.disruption.consolidation_policy
-        consolidateAfter    = local.node_pool.disruption.consolidate_after
-        expireAfter         = local.node_pool.disruption.expire_after
+        consolidationPolicy = local.node_pool_arm64.disruption.consolidation_policy
+        consolidateAfter    = local.node_pool_arm64.disruption.consolidate_after
+        expireAfter         = local.node_pool_arm64.disruption.expire_after
 
         budgets = [{
-          nodes = local.node_pool.disruption.budget_nodes
+          nodes = local.node_pool_arm64.disruption.budget_nodes
         }]
       }
 
       # Weight - lower number = higher priority
-      weight = local.node_pool.weight
+      weight = local.node_pool_arm64.weight
     }
   })
 }
+
+################################################################################
+# AMD64 Support (x86_64) - COMMENTED OUT
+# Uncomment the resources below to enable AMD64 workloads
+# After uncommenting, run: make apply-addons
+################################################################################
+
+# resource "kubectl_manifest" "karpenter_node_class_amd64" {
+#   depends_on = [helm_release.karpenter]
+#
+#   yaml_body = yamlencode({
+#     apiVersion = "karpenter.k8s.aws/v1"
+#     kind       = "EC2NodeClass"
+#     metadata = {
+#       name = local.node_class_amd64.name
+#     }
+#     spec = {
+#       # AMI Selection - AL2023 AMD64 (x86_64)
+#       amiFamily = local.node_class_amd64.ami_family
+#       amiSelectorTerms = [{
+#         alias = local.node_class_amd64.ami_alias
+#       }]
+#
+#       # Subnet selection - use private subnets with Karpenter tag
+#       subnetSelectorTerms = [{
+#         tags = {
+#           "karpenter.sh/discovery" = data.terraform_remote_state.eks.outputs.cluster_name
+#         }
+#       }]
+#
+#       # Security group selection
+#       securityGroupSelectorTerms = [{
+#         tags = {
+#           "karpenter.sh/discovery" = data.terraform_remote_state.eks.outputs.cluster_name
+#         }
+#       }]
+#
+#       # IAM role for nodes
+#       role = data.terraform_remote_state.eks.outputs.bootstrap_node_role_name
+#
+#       # Block device mappings
+#       blockDeviceMappings = [{
+#         deviceName = "/dev/xvda"
+#         ebs = {
+#           volumeSize          = local.node_class_amd64.disk_size
+#           volumeType          = "gp3"
+#           encrypted           = true
+#           deleteOnTermination = true
+#         }
+#       }]
+#
+#       # Metadata options
+#       metadataOptions = {
+#         httpEndpoint            = "enabled"
+#         httpProtocolIPv6        = "disabled"
+#         httpPutResponseHopLimit = 2
+#         httpTokens              = "required" # IMDSv2 required
+#       }
+#
+#       # Tags
+#       tags = merge(
+#         var.default_tags,
+#         {
+#           "Name"                   = "${data.terraform_remote_state.eks.outputs.cluster_name}-karpenter-amd64"
+#           "karpenter.sh/discovery" = data.terraform_remote_state.eks.outputs.cluster_name
+#         }
+#       )
+#     }
+#   })
+# }
+
+# resource "kubectl_manifest" "karpenter_node_pool_amd64" {
+#   depends_on = [kubectl_manifest.karpenter_node_class_amd64]
+#
+#   yaml_body = yamlencode({
+#     apiVersion = "karpenter.sh/v1"
+#     kind       = "NodePool"
+#     metadata = {
+#       name = local.node_pool_amd64.name
+#     }
+#     spec = {
+#       # Template for nodes
+#       template = {
+#         metadata = {
+#           labels = {
+#             "node.kubernetes.io/managed-by" = "karpenter"
+#           }
+#         }
+#         spec = {
+#           nodeClassRef = {
+#             group = "karpenter.k8s.aws"
+#             kind  = "EC2NodeClass"
+#             name  = local.node_class_amd64.name
+#           }
+#
+#           # Requirements - AMD64 nodes (t3 instances)
+#           requirements = [
+#             {
+#               key      = "kubernetes.io/arch"
+#               operator = "In"
+#               values   = local.node_pool_amd64.requirements.arch
+#             },
+#             {
+#               key      = "kubernetes.io/os"
+#               operator = "In"
+#               values   = local.node_pool_amd64.requirements.os
+#             },
+#             {
+#               key      = "karpenter.sh/capacity-type"
+#               operator = "In"
+#               values   = local.node_pool_amd64.requirements.capacity_type
+#             },
+#             {
+#               key      = "karpenter.k8s.aws/instance-category"
+#               operator = "In"
+#               values   = local.node_pool_amd64.requirements.instance_category
+#             },
+#             {
+#               key      = "karpenter.k8s.aws/instance-generation"
+#               operator = "Gt"
+#               values   = [local.node_pool_amd64.requirements.instance_generation]
+#             }
+#           ]
+#         }
+#       }
+#
+#       # Limits - prevent runaway scaling
+#       limits = {
+#         cpu    = local.node_pool_amd64.limits.cpu
+#         memory = local.node_pool_amd64.limits.memory
+#       }
+#
+#       # Disruption budget
+#       disruption = {
+#         consolidationPolicy = local.node_pool_amd64.disruption.consolidation_policy
+#         consolidateAfter    = local.node_pool_amd64.disruption.consolidate_after
+#         expireAfter         = local.node_pool_amd64.disruption.expire_after
+#
+#         budgets = [{
+#           nodes = local.node_pool_amd64.disruption.budget_nodes
+#         }]
+#       }
+#
+#       # Weight - lower priority than ARM64 (higher number)
+#       weight = local.node_pool_amd64.weight
+#     }
+#   })
+# }
