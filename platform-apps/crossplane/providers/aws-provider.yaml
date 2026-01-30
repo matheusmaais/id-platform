@@ -14,7 +14,7 @@ kind: Provider
 metadata:
   name: provider-aws-s3
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "10"  # After Crossplane CRDs
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-s3:v1.23.0
   runtimeConfigRef:
@@ -25,7 +25,7 @@ kind: Provider
 metadata:
   name: provider-aws-cloudfront
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "10"  # After Crossplane CRDs
 spec:
   package: xpkg.upbound.io/upbound/provider-aws-cloudfront:v1.22.0
   runtimeConfigRef:
@@ -39,7 +39,7 @@ kind: DeploymentRuntimeConfig
 metadata:
   name: provider-aws-config
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "10"  # After Crossplane CRDs
 spec:
   deploymentTemplate:
     spec:

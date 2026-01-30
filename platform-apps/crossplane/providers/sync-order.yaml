@@ -1,0 +1,6 @@
+# This file is intentionally empty but required for directory structure.
+# The actual provider manifests are in aws-provider.yaml and provider-config.yaml
+# 
+# Sync order is controlled by annotations:
+# 1. aws-provider.yaml (wave 1) - Installs Provider CRDs
+# 2. provider-config.yaml (wave 2) - Creates ProviderConfig (requires Provider CRDs)

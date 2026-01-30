@@ -21,7 +21,8 @@ metadata:
   labels:
     crossplane.io/xrd: xstaticwebsites.platform.darede.io
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "30"  # After XRD
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   compositeTypeRef:
     apiVersion: platform.darede.io/v1alpha1

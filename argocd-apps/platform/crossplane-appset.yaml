@@ -75,6 +75,8 @@ spec:
           # Namespace created by Terraform (for IRSA ServiceAccount)
           - CreateNamespace=false
           - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true  # Allow resources that depend on CRDs not yet installed
+          - RespectIgnoreDifferences=true
         retry:
           limit: 5
           backoff:

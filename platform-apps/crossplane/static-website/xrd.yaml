@@ -7,7 +7,8 @@ kind: CompositeResourceDefinition
 metadata:
   name: xstaticwebsites.platform.darede.io
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "20"  # After Provider CRDs
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   group: platform.darede.io
   names:
