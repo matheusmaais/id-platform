@@ -97,16 +97,20 @@ Last Updated: 2026-01-30 13:15 UTC
 
 **Goal:** Add a new Backstage template to create static websites with S3 + CloudFront CDN.
 
-**Final Deployment State (2026-01-30 13:15 UTC):**
-- Crossplane Core: Running (3min uptime after recreation)
-- function-patch-and-transform: INSTALLED=True, HEALTHY=True
-- Providers: provider-aws-s3 (v1.16.0), provider-aws-cloudfront (v1.16.0) - Both Healthy
-- XRD xstaticwebsites.platform.darede.io: ESTABLISHED=True, OFFERED=True
-- Composition static-website: DEPLOYED (mode: Pipeline)
-- ProviderConfig default: Created with IRSA
-- API StaticWebsite: Available for use via Backstage
+**Final Deployment State (2026-01-30 13:30 UTC):**
+- Crossplane Core: Running (mode: Pipeline v2) ✅
+- function-patch-and-transform: INSTALLED=True, HEALTHY=True ✅
+- Providers: provider-aws-s3 (v1.16.0), provider-aws-cloudfront (v1.16.0) - Both Healthy ✅
+- XRD xstaticwebsites.platform.darede.io: ESTABLISHED=True, OFFERED=True ✅
+- Composition static-website: DEPLOYED (422 lines, 6 resources) ✅
+- ProviderConfig default: Created with IRSA ✅
+- API StaticWebsite: Available for use via Backstage ✅
+- GitHub Actions IAM: StaticSitePublish policy applied (S3 + CloudFront) ✅
 
-**Key Achievement:** Successfully converted to Crossplane v2 Pipeline mode using GitOps principles.
+**Key Achievements:**
+1. Crossplane v2 Pipeline mode conversion via GitOps
+2. GitHub Actions OIDC role expanded with S3/CloudFront permissions
+3. Complete E2E workflow: Backstage → Crossplane → GitHub Actions → CloudFront
 
 **Architecture:**
 ```
