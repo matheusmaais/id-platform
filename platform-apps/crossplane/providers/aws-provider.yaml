@@ -16,7 +16,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "10"  # After Crossplane CRDs
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-s3:v1.23.0
+  package: xpkg.upbound.io/upbound/provider-aws-s3:v1.16.0
   runtimeConfigRef:
     name: provider-aws-config
 ---
@@ -27,7 +27,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "10"  # After Crossplane CRDs
 spec:
-  package: xpkg.upbound.io/upbound/provider-aws-cloudfront:v1.22.0
+  package: xpkg.upbound.io/upbound/provider-aws-cloudfront:v1.16.0
   runtimeConfigRef:
     name: provider-aws-config
 ---
