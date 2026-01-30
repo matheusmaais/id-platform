@@ -1,0 +1,94 @@
+################################################################################
+# Crossplane ApplicationSet
+# Uses Git File Generator to read config/platform-params.yaml
+# Installs Crossplane + AWS Provider with IRSA
+################################################################################
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  
+  generators:
+    # Git File Generator - reads config/platform-params.yaml
+    - git:
+        repoURL: 'https://github.com/darede-labs/idp-platform'
+        revision: 'main'
+        files:
+          - path: "config/platform-params.yaml"
+  
+  template:
+    metadata:
+      name: 'crossplane'
+      namespace: argocd
+      annotations:
+        repo_url: '{{.repository.url}}'
+        repo_branch: '{{.repository.branch}}'
+        notifications.argoproj.io/subscribe.on-sync-succeeded.slack: platform-notifications
+    
+    spec:
+      project: default
+      
+      sources:
+        # Crossplane Helm chart from official repo
+        - repoURL: '{{.charts.crossplane.repo}}'
+          chart: crossplane
+          targetRevision: '{{.charts.crossplane.version}}'
+          helm:
+            releaseName: crossplane
+            valueFiles:
+              - $values/platform-apps/crossplane/values.yaml
+        
+        # Values and additional manifests from our Git repo
+        - repoURL: '{{.repository.url}}'
+          targetRevision: '{{.repository.branch}}'
+          ref: values
+        
+        # Provider configs and XRDs (non-Helm manifests)
+        - repoURL: '{{.repository.url}}'
+          targetRevision: '{{.repository.branch}}'
+          path: platform-apps/crossplane/providers
+          directory:
+            recurse: true
+        
+        # Static Website XRD and Composition
+        - repoURL: '{{.repository.url}}'
+          targetRevision: '{{.repository.branch}}'
+          path: platform-apps/crossplane/static-website
+          directory:
+            recurse: true
+      
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: crossplane-system
+      
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          # Namespace created by Terraform (for IRSA ServiceAccount)
+          - CreateNamespace=false
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m
+      
+      # Crossplane CRDs can take time to reconcile
+      ignoreDifferences:
+        - group: apiextensions.crossplane.io
+          kind: CompositeResourceDefinition
+          jsonPointers:
+            - /spec/versions
+        - group: pkg.crossplane.io
+          kind: Provider
+          jsonPointers:
+            - /spec/package

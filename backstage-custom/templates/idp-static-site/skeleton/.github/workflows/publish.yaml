@@ -1,0 +1,115 @@
+name: Publish Static Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+  workflow_dispatch:
+
+env:
+  # Site configuration (from template)
+  SITE_NAME: ${{ values.name }}
+  ENVIRONMENT: ${{ values.environment }}
+  AWS_REGION: ${{ values.awsRegion }}
+  AWS_ACCOUNT_ID: ${{ values.awsAccountId }}
+  
+  # Bucket name follows convention: {siteName}-static-{environment}
+  BUCKET_NAME: ${{ values.name }}-static-${{ values.environment }}
+
+jobs:
+  publish:
+    name: Publish to S3
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ values.githubActionsRoleName }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Wait for bucket to exist
+        id: wait-bucket
+        run: |
+          echo "Waiting for bucket ${BUCKET_NAME} to be available..."
+          for i in {1..30}; do
+            if aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
+              echo "Bucket ${BUCKET_NAME} is ready!"
+              echo "bucket_ready=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Attempt $i/30 - Bucket not ready yet, waiting 10s..."
+            sleep 10
+          done
+          echo "Bucket ${BUCKET_NAME} not available after 5 minutes"
+          echo "bucket_ready=false" >> $GITHUB_OUTPUT
+          exit 1
+      
+      - name: Sync to S3
+        if: steps.wait-bucket.outputs.bucket_ready == 'true'
+        run: |
+          echo "Syncing site/ to s3://${BUCKET_NAME}..."
+          aws s3 sync site/ "s3://${BUCKET_NAME}" \
+            --delete \
+            --cache-control "max-age=31536000,public" \
+            --exclude "*.html" \
+            --exclude "*.json"
+          
+          # HTML and JSON files with shorter cache
+          aws s3 sync site/ "s3://${BUCKET_NAME}" \
+            --cache-control "max-age=300,public" \
+            --include "*.html" \
+            --include "*.json"
+          
+          echo "Sync complete!"
+      
+      - name: Get CloudFront Distribution ID
+        id: get-distribution
+        if: steps.wait-bucket.outputs.bucket_ready == 'true'
+        run: |
+          # Find CloudFront distribution by S3 origin
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Origins.Items[?contains(DomainName, '${BUCKET_NAME}')]].Id | [0]" \
+            --output text)
+          
+          if [ "$DIST_ID" != "None" ] && [ -n "$DIST_ID" ]; then
+            echo "Found distribution: ${DIST_ID}"
+            echo "distribution_id=${DIST_ID}" >> $GITHUB_OUTPUT
+          else
+            echo "CloudFront distribution not found yet (may still be provisioning)"
+            echo "distribution_id=" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Invalidate CloudFront cache
+        if: steps.get-distribution.outputs.distribution_id != ''
+        run: |
+          echo "Creating CloudFront invalidation..."
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "${{ steps.get-distribution.outputs.distribution_id }}" \
+            --paths "/*" \
+            --query "Invalidation.Id" \
+            --output text)
+          
+          echo "Invalidation created: ${INVALIDATION_ID}"
+          echo "Cache invalidation may take a few minutes to complete."
+      
+      - name: Print site URL
+        if: steps.get-distribution.outputs.distribution_id != ''
+        run: |
+          DOMAIN=$(aws cloudfront get-distribution \
+            --id "${{ steps.get-distribution.outputs.distribution_id }}" \
+            --query "Distribution.DomainName" \
+            --output text)
+          
+          echo "----------------------------------------"
+          echo "Site published successfully!"
+          echo "URL: https://${DOMAIN}"
+          echo "----------------------------------------"

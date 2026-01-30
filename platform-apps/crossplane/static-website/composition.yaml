@@ -1,0 +1,420 @@
+# Composition for Static Website
+#
+# Crossplane v2 Best Practices Applied:
+# - Granular providers (S3 + CloudFront only)
+# - IRSA authentication (no static credentials)
+# - ReadinessChecks for resource validation
+# - Dynamic environment/region (no hardcoded values)
+# - Proper resource dependencies via refs
+#
+# Creates the following resources:
+# 1. S3 Bucket (private, versioned)
+# 2. S3 Bucket Public Access Block
+# 3. S3 Bucket Ownership Controls
+# 4. CloudFront Origin Access Control
+# 5. CloudFront Distribution
+# 6. S3 Bucket Policy (allows CloudFront OAC)
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: static-website
+  labels:
+    crossplane.io/xrd: xstaticwebsites.platform.darede.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  compositeTypeRef:
+    apiVersion: platform.darede.io/v1alpha1
+    kind: XStaticWebsite
+  
+  # Patch sets for common transformations
+  patchSets:
+    - name: common-tags
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.siteName
+          toFieldPath: spec.forProvider.tags.Site
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.environment
+          toFieldPath: spec.forProvider.tags.Environment
+
+  resources:
+    # 1. S3 Bucket
+    - name: bucket
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta2
+        kind: Bucket
+        spec:
+          forProvider:
+            tags:
+              ManagedBy: crossplane
+              Platform: idp
+          providerConfigRef:
+            name: default
+      patches:
+        # Dynamic bucket name: {siteName}-static-{environment}
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s"
+          toFieldPath: metadata.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.siteName
+          toFieldPath: spec.forProvider.tags.Site
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.environment
+          toFieldPath: spec.forProvider.tags.Environment
+        # Export bucket name to status
+        - type: ToCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: status.bucketName
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.arn
+          toFieldPath: status.bucketArn
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"
+
+    # 2. S3 Bucket Public Access Block
+    - name: bucket-public-access-block
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: BucketPublicAccessBlock
+        spec:
+          forProvider:
+            blockPublicAcls: true
+            blockPublicPolicy: true
+            ignorePublicAcls: true
+            restrictPublicBuckets: true
+          providerConfigRef:
+            name: default
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-pab"
+          toFieldPath: metadata.name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s"
+          toFieldPath: spec.forProvider.bucketRef.name
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"
+
+    # 3. S3 Bucket Ownership Controls
+    - name: bucket-ownership
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: BucketOwnershipControls
+        spec:
+          forProvider:
+            rule:
+              - objectOwnership: BucketOwnerEnforced
+          providerConfigRef:
+            name: default
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-ownership"
+          toFieldPath: metadata.name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s"
+          toFieldPath: spec.forProvider.bucketRef.name
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"
+
+    # 4. CloudFront Origin Access Control
+    - name: cloudfront-oac
+      base:
+        apiVersion: cloudfront.aws.upbound.io/v1beta1
+        kind: OriginAccessControl
+        spec:
+          forProvider:
+            description: OAC for static website
+            originAccessControlOriginType: s3
+            signingBehavior: always
+            signingProtocol: sigv4
+          providerConfigRef:
+            name: default
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-oac"
+          toFieldPath: metadata.name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-oac"
+          toFieldPath: spec.forProvider.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.id
+          toFieldPath: status.oacId
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"
+
+    # 5. CloudFront Distribution
+    - name: cloudfront-distribution
+      base:
+        apiVersion: cloudfront.aws.upbound.io/v1beta2
+        kind: Distribution
+        spec:
+          forProvider:
+            enabled: true
+            isIpv6Enabled: true
+            httpVersion: http2and3
+            priceClass: PriceClass_100
+            defaultRootObject: index.html
+            
+            origin:
+              - connectionAttempts: 3
+                connectionTimeout: 10
+                s3OriginConfig:
+                  - originAccessIdentity: ""  # Empty for OAC
+            
+            defaultCacheBehavior:
+              - allowedMethods:
+                  - GET
+                  - HEAD
+                  - OPTIONS
+                cachedMethods:
+                  - GET
+                  - HEAD
+                compress: true
+                viewerProtocolPolicy: redirect-to-https
+                # AWS Managed CachingOptimized policy
+                cachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
+                
+            restrictions:
+              - geoRestriction:
+                  - restrictionType: none
+            
+            viewerCertificate:
+              - cloudfrontDefaultCertificate: true
+            
+            # SPA support: redirect 403/404 to index.html
+            customErrorResponse:
+              - errorCode: 403
+                responseCode: 200
+                responsePagePath: /index.html
+                errorCachingMinTtl: 10
+              - errorCode: 404
+                responseCode: 200
+                responsePagePath: /index.html
+                errorCachingMinTtl: 10
+            
+            tags:
+              ManagedBy: crossplane
+              Platform: idp
+              
+          providerConfigRef:
+            name: default
+      patches:
+        # Resource name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-cf"
+          toFieldPath: metadata.name
+        # Region
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        # Price class
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.priceClass
+          toFieldPath: spec.forProvider.priceClass
+        # Default root object
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.indexDocument
+          toFieldPath: spec.forProvider.defaultRootObject
+        # Origin ID (dynamic)
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "s3-%s-static-%s"
+          toFieldPath: spec.forProvider.origin[0].originId
+        # Origin domain name (dynamic with region)
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+              - fromFieldPath: spec.region
+            strategy: string
+            string:
+              fmt: "%s-static-%s.s3.%s.amazonaws.com"
+          toFieldPath: spec.forProvider.origin[0].domainName
+        # Target origin ID for cache behavior
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "s3-%s-static-%s"
+          toFieldPath: spec.forProvider.defaultCacheBehavior[0].targetOriginId
+        # OAC reference
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-oac"
+          toFieldPath: spec.forProvider.origin[0].originAccessControlIdRef.name
+        # Tags
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.siteName
+          toFieldPath: spec.forProvider.tags.Site
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.environment
+          toFieldPath: spec.forProvider.tags.Environment
+        # Export to status
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.id
+          toFieldPath: status.distributionId
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.arn
+          toFieldPath: status.distributionArn
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.domainName
+          toFieldPath: status.cloudfrontUrl
+          transforms:
+            - type: string
+              string:
+                type: Format
+                fmt: "https://%s"
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"
+
+    # 6. S3 Bucket Policy (allows CloudFront OAC access)
+    # Note: Must be created after CloudFront to get distribution ARN
+    - name: bucket-policy
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: BucketPolicy
+        spec:
+          forProvider:
+            policy: ""  # Set via patch
+          providerConfigRef:
+            name: default
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s-policy"
+          toFieldPath: metadata.name
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+            strategy: string
+            string:
+              fmt: "%s-static-%s"
+          toFieldPath: spec.forProvider.bucketRef.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.region
+        # Policy document - allows CloudFront service principal with distribution ARN
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.siteName
+              - fromFieldPath: spec.environment
+              - fromFieldPath: status.distributionArn
+            strategy: string
+            string:
+              fmt: |
+                {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Sid": "AllowCloudFrontServicePrincipal",
+                      "Effect": "Allow",
+                      "Principal": {
+                        "Service": "cloudfront.amazonaws.com"
+                      },
+                      "Action": "s3:GetObject",
+                      "Resource": "arn:aws:s3:::%s-static-%s/*",
+                      "Condition": {
+                        "StringEquals": {
+                          "AWS:SourceArn": "%s"
+                        }
+                      }
+                    }
+                  ]
+                }
+          toFieldPath: spec.forProvider.policy
+      readinessChecks:
+        - type: MatchCondition
+          matchCondition:
+            type: Ready
+            status: "True"

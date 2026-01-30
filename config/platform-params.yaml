@@ -76,5 +76,5 @@ charts:
     version: "2.6.3"  # Latest stable (verified 2026-01-27)
     repo: https://backstage.github.io/charts
   crossplane:
-    version: "2.1.3"  # Latest stable (verified 2026-01-27)
+    version: "2.1.1"  # Latest stable (verified 2026-01-29, see github.com/crossplane/crossplane/releases)
     repo: https://charts.crossplane.io/stable

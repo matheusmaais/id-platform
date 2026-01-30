@@ -1,0 +1,96 @@
+# CompositeResourceDefinition (XRD) for Static Website
+# 
+# This defines the API for creating static websites with S3 + CloudFront
+# Users create "StaticWebsite" claims, Crossplane provisions the infrastructure
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xstaticwebsites.platform.darede.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  group: platform.darede.io
+  names:
+    kind: XStaticWebsite
+    plural: xstaticwebsites
+  
+  # Claim configuration - what users create
+  claimNames:
+    kind: StaticWebsite
+    plural: staticwebsites
+  
+  # Connection secret configuration
+  connectionSecretKeys:
+    - bucketName
+    - cloudfrontUrl
+    - distributionId
+  
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              description: StaticWebsite specification
+              properties:
+                siteName:
+                  type: string
+                  description: Name of the static website (used in bucket name and tags)
+                  pattern: '^[a-z][a-z0-9-]*$'
+                  maxLength: 32
+                environment:
+                  type: string
+                  description: Environment (dev, staging, prod)
+                  default: dev
+                  enum:
+                    - dev
+                    - staging
+                    - prod
+                region:
+                  type: string
+                  description: AWS region for S3 bucket
+                  default: us-east-1
+                indexDocument:
+                  type: string
+                  description: Default index document
+                  default: index.html
+                errorDocument:
+                  type: string
+                  description: Error document for 404s
+                  default: error.html
+                priceClass:
+                  type: string
+                  description: CloudFront price class
+                  default: PriceClass_100
+                  enum:
+                    - PriceClass_100
+                    - PriceClass_200
+                    - PriceClass_All
+              required:
+                - siteName
+            status:
+              type: object
+              description: StaticWebsite status (populated by Crossplane)
+              properties:
+                bucketName:
+                  type: string
+                  description: Name of the created S3 bucket
+                bucketArn:
+                  type: string
+                  description: ARN of the created S3 bucket
+                cloudfrontUrl:
+                  type: string
+                  description: CloudFront distribution URL
+                distributionId:
+                  type: string
+                  description: CloudFront distribution ID
+                distributionArn:
+                  type: string
+                  description: CloudFront distribution ARN
+                oacId:
+                  type: string
+                  description: Origin Access Control ID

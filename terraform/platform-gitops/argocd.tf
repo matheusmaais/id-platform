@@ -72,10 +72,10 @@ resource "helm_release" "argocd" {
           "policy.csv" = <<-EOT
             # ArgoCD Admins group gets admin role (Cognito group name)
             g, ${local.cognito.admin_group_name}, role:admin
-            
+
             # Fallback: Admin email gets admin role (in case group mapping fails)
             g, ${local.cognito_admin_email}, role:admin
-            
+
             # Additional custom policies can be added here
           EOT
 

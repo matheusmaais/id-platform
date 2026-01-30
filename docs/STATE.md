@@ -86,10 +86,93 @@ Includes:
 ## 🧠 CURRENT STATE
 
 **Repository:** darede-labs/idp-platform (migrated from matheusmaais/id-platform on 2026-01-28)
-Phase: Phase 2 — App Scaffolding & Deploy (COMPLETE)
-Status: ✅ CODE COMPLETE / ✅ TERRAFORM APPLIED / ✅ VALIDATED
+Phase: Phase 2 — App Scaffolding & Deploy (COMPLETE) + Static Site Template (CODE COMPLETE)
+Status: ✅ CODE COMPLETE / ⏳ TERRAFORM APPLY PENDING / ⏳ VALIDATION PENDING
 Branch: main
-Last Updated: 2026-01-28 20:06 UTC
+Last Updated: 2026-01-29 22:00 UTC
+
+### 📦 Static Site Template Implementation (2026-01-29)
+
+**Goal:** Add a new Backstage template to create static websites with S3 + CloudFront CDN.
+
+**Architecture:**
+```
+Backstage → GitHub Repo → ArgoCD → Crossplane → S3 + CloudFront
+                ↓
+         GitHub Actions → Upload to S3 → Invalidate Cache
+```
+
+**Components Created:**
+
+1. **Crossplane ApplicationSet** (`argocd-apps/platform/crossplane-appset.yaml`)
+   - Git File Generator reading `config/platform-params.yaml`
+   - Installs Crossplane Helm chart v2.1.3
+   - Deploys AWS S3 + CloudFront providers
+   - Applies XRD and Composition for static websites
+
+2. **Crossplane IRSA** (`terraform/platform-gitops/crossplane.tf`)
+   - IAM Role: `${cluster_name}-crossplane`
+   - Trust: ServiceAccounts matching `crossplane-provider-aws-*`
+   - Permissions: S3 bucket management, CloudFront distribution management
+   - ServiceAccount created by Terraform with IRSA annotation
+
+3. **AWS Providers** (`platform-apps/crossplane/providers/`)
+   - `provider-aws-s3` v1.17.0
+   - `provider-aws-cloudfront` v1.17.0
+   - DeploymentRuntimeConfig for IRSA
+
+4. **XRD + Composition** (`platform-apps/crossplane/static-website/`)
+   - XRD: `xstaticwebsites.platform.darede.io`
+   - Claim: `StaticWebsite`
+   - Resources: S3 Bucket, Public Access Block, OAC, CloudFront Distribution, Bucket Policy
+   - Status exports: bucketName, cloudfrontUrl, distributionId
+
+5. **Backstage Template** (`backstage-custom/templates/idp-static-site/`)
+   - Parameters: siteName, description, owner, priceClass
+   - Skeleton: site/, deploy/, .github/workflows/, catalog-info.yaml
+   - CI: OIDC auth, S3 sync, CloudFront invalidation
+
+**Key Decisions:**
+- Bucket name convention: `{siteName}-static-{env}` (no SSM lookup needed)
+- No custom domain (uses CloudFront URL directly)
+- ACM certificate: Not included (platform prereq, already exists)
+- CI role permissions: Documented in `docs/STATIC-SITE-TEMPLATE.md` (customer prereq)
+
+**Files Created:**
+```
+argocd-apps/platform/crossplane-appset.yaml
+terraform/platform-gitops/crossplane.tf
+platform-apps/crossplane/
+├── values.yaml
+├── providers/
+│   ├── aws-provider.yaml
+│   └── provider-config.yaml
+└── static-website/
+    ├── xrd.yaml
+    └── composition.yaml
+backstage-custom/templates/idp-static-site/
+├── template.yaml
+└── skeleton/
+    ├── site/
+    │   ├── index.html
+    │   └── error.html
+    ├── deploy/
+    │   ├── namespace.yaml
+    │   └── static-website-claim.yaml
+    ├── .github/workflows/publish.yaml
+    ├── catalog-info.yaml
+    ├── README.md
+    └── .gitignore
+docs/STATIC-SITE-TEMPLATE.md
+```
+
+**Next Steps:**
+1. Apply Terraform: `cd terraform/platform-gitops && terraform apply`
+2. Wait for ArgoCD to sync Crossplane
+3. Verify providers are healthy: `kubectl get providers.pkg.crossplane.io`
+4. Verify XRD exists: `kubectl get xrd xstaticwebsites.platform.darede.io`
+5. Add S3/CloudFront permissions to GitHub Actions role (customer prereq)
+6. Test E2E: Create site via Backstage, verify deployment
 
 ### 🔄 Repository Migration (2026-01-28)
 

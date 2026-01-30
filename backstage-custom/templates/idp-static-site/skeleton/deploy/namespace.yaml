@@ -1,0 +1,10 @@
+# Namespace for the static website resources
+# Created by ArgoCD before the Crossplane claim
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${{ values.name }}
+  labels:
+    app.kubernetes.io/name: ${{ values.name }}
+    app.kubernetes.io/managed-by: argocd
+    platform.darede.io/type: static-website

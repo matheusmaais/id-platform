@@ -119,10 +119,17 @@ backstage:
       rules:
         - allow: [Component, System, API, Resource, Location]
       locations:
+        # Node.js App Template
         - type: url
           target: ${PLATFORM_REPO_URL}/blob/${PLATFORM_REPO_BRANCH}/backstage-custom/templates/idp-nodejs-app/template.yaml
           rules:
             - allow: [Template]
+        # Static Website + CDN Template
+        - type: url
+          target: ${PLATFORM_REPO_URL}/blob/${PLATFORM_REPO_BRANCH}/backstage-custom/templates/idp-static-site/template.yaml
+          rules:
+            - allow: [Template]
+        # Backstage examples (optional)
         - type: url
           target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml
   # Resources

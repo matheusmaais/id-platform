@@ -1,0 +1,110 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: idp-static-site
+  title: Create Static Website + CDN
+  description: Create a static website hosted on S3 with CloudFront CDN
+  tags:
+    - static-site
+    - s3
+    - cloudfront
+    - recommended
+spec:
+  owner: platform-team
+  type: website
+  
+  parameters:
+    - title: Website Details
+      required:
+        - name
+        - description
+      properties:
+        name:
+          title: Site Name
+          type: string
+          description: Unique name of the website (lowercase, no spaces)
+          pattern: '^[a-z][a-z0-9-]*$'
+          maxLength: 32
+          ui:autofocus: true
+          ui:help: 'Example: my-docs or company-landing'
+        description:
+          title: Description
+          type: string
+          description: Short description of the website
+        owner:
+          title: Owner
+          type: string
+          description: Team or user owning this website
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: [User, Group]
+    
+    - title: Configuration
+      properties:
+        priceClass:
+          title: CloudFront Price Class
+          type: string
+          description: Geographic distribution for CDN (affects cost)
+          enum:
+            - PriceClass_100
+            - PriceClass_200
+            - PriceClass_All
+          enumNames:
+            - 'NA & EU only (cheapest)'
+            - 'NA, EU, Asia, Middle East, Africa'
+            - 'All edge locations (global)'
+          default: PriceClass_100
+  
+  steps:
+    # Step 1: Fetch template skeleton
+    - id: fetch-base
+      name: Fetch Base
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          priceClass: ${{ parameters.priceClass }}
+          # From environment.parameters (platform-params ConfigMap)
+          githubOrg: ${{ environment.parameters.githubOrg }}
+          repoPrefix: ${{ environment.parameters.repoPrefix }}
+          repoVisibility: ${{ environment.parameters.repoVisibility }}
+          domain: ${{ environment.parameters.domain }}
+          awsRegion: ${{ environment.parameters.awsRegion }}
+          awsAccountId: ${{ environment.parameters.awsAccountId }}
+          githubActionsRoleName: ${{ environment.parameters.githubActionsRoleName }}
+          environment: ${{ environment.parameters.environment }}
+    
+    # Step 2: Create GitHub repository
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        description: ${{ parameters.description }}
+        repoUrl: github.com?owner=${{ environment.parameters.githubOrg }}&repo=${{ environment.parameters.repoPrefix }}${{ parameters.name }}
+        repoVisibility: ${{ environment.parameters.repoVisibility }}
+        defaultBranch: main
+        protectDefaultBranch: false
+    
+    # Step 3: Register component in catalog
+    - id: register
+      name: Register Component
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+  
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+      - title: CI Pipeline
+        url: https://github.com/${{ environment.parameters.githubOrg }}/${{ environment.parameters.repoPrefix }}${{ parameters.name }}/actions
+      - title: ArgoCD Application
+        url: https://argocd.${{ environment.parameters.domain }}/applications/${{ environment.parameters.repoPrefix }}${{ parameters.name }}

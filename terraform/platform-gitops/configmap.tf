@@ -61,22 +61,26 @@ resource "kubernetes_config_map" "platform_params" {
     ECR_REGISTRY = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"
 
     # App platform (Scaffolder + ArgoCD AppSet)
-    APPS_MANIFESTS_PATH      = local.apps_manifests_path
-    APPS_NAMESPACE_STRATEGY  = local.apps_namespace_strategy
-    APPS_NAMESPACE_TEMPLATE  = local.apps_namespace_template
-    APPS_DEFAULT_ARCH        = local.app_default_arch
-    ALB_SHARED_GROUP_NAME    = local.alb_shared_group_name
-    ALB_SCHEME               = local.alb_scheme
-    ALB_TARGET_TYPE          = local.alb_target_type
-    CI_AUTH_MODE             = local.ci_auth_mode
+    APPS_MANIFESTS_PATH       = local.apps_manifests_path
+    APPS_NAMESPACE_STRATEGY   = local.apps_namespace_strategy
+    APPS_NAMESPACE_TEMPLATE   = local.apps_namespace_template
+    APPS_DEFAULT_ARCH         = local.app_default_arch
+    ALB_SHARED_GROUP_NAME     = local.alb_shared_group_name
+    ALB_SCHEME                = local.alb_scheme
+    ALB_TARGET_TYPE           = local.alb_target_type
+    CI_AUTH_MODE              = local.ci_auth_mode
     CI_ECR_REPO_PREFIX        = local.ci_ecr_repo_prefix
-    CI_IMAGE_TAG_STRATEGY    = local.ci_image_tag_strategy
-    BUILD_PLATFORM_ARM64     = local.build_platform_arm64
-    BUILD_PLATFORM_AMD64     = local.build_platform_amd64
-    BUILD_PLATFORM_MULTI     = local.build_platform_multi
+    CI_IMAGE_TAG_STRATEGY     = local.ci_image_tag_strategy
+    BUILD_PLATFORM_ARM64      = local.build_platform_arm64
+    BUILD_PLATFORM_AMD64      = local.build_platform_amd64
+    BUILD_PLATFORM_MULTI      = local.build_platform_multi
     SCHEDULING_ARCH_LABEL_KEY = local.scheduling_arch_label_key
-    SCHEDULING_ARM_VALUE     = local.scheduling_arm_value
-    SCHEDULING_AMD_VALUE     = local.scheduling_amd_value
+    SCHEDULING_ARM_VALUE      = local.scheduling_arm_value
+    SCHEDULING_AMD_VALUE      = local.scheduling_amd_value
+
+    # Crossplane
+    CROSSPLANE_ROLE_ARN = aws_iam_role.crossplane.arn
+    ENVIRONMENT         = local.environment
   }
 
   depends_on = [

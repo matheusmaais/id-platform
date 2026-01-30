@@ -1,0 +1,60 @@
+# AWS Providers for Crossplane
+# Uses Upbound's official AWS providers (granular, not family provider)
+# 
+# Version: v1.23.0 (latest stable as of 2026-01-29)
+# See: https://marketplace.upbound.io/providers/upbound/provider-aws-s3
+#
+# Best Practices Applied:
+# - IRSA for authentication (no static credentials)
+# - DeploymentRuntimeConfig for runtime customization
+# - Granular providers (only S3 + CloudFront, not full family)
+# - Webhooks enabled for validation
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-s3
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-s3:v1.23.0
+  runtimeConfigRef:
+    name: provider-aws-config
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-cloudfront
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-cloudfront:v1.22.0
+  runtimeConfigRef:
+    name: provider-aws-config
+---
+# DeploymentRuntimeConfig for IRSA
+# This configures all AWS providers to use IRSA for authentication
+# Replaces deprecated ControllerConfig (removed in Crossplane v2)
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-aws-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          serviceAccountName: provider-aws
+          containers:
+            - name: package-runtime
+              args:
+                - --debug
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi

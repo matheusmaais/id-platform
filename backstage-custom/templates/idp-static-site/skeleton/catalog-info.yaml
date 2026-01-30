@@ -1,0 +1,40 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    # GitHub integration
+    github.com/project-slug: ${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}
+    
+    # ArgoCD integration
+    argocd/app-name: ${{ values.repoPrefix }}${{ values.name }}
+    
+    # Crossplane resource tracking
+    crossplane.io/claim-name: ${{ values.name }}
+    crossplane.io/claim-namespace: ${{ values.name }}
+    
+    # AWS resource tags for discovery
+    aws.amazon.com/s3-bucket: ${{ values.name }}-static-${{ values.environment }}
+    
+  links:
+    - url: https://github.com/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}/actions
+      title: CI Pipeline
+      icon: github
+    - url: https://argocd.${{ values.domain }}/applications/${{ values.repoPrefix }}${{ values.name }}
+      title: ArgoCD
+      icon: web
+    - url: https://console.aws.amazon.com/s3/buckets/${{ values.name }}-static-${{ values.environment }}
+      title: S3 Bucket
+      icon: cloud
+    - url: https://console.aws.amazon.com/cloudfront/home
+      title: CloudFront Console
+      icon: cloud
+  tags:
+    - static-site
+    - s3
+    - cloudfront
+spec:
+  type: website
+  lifecycle: experimental
+  owner: ${{ values.owner }}

@@ -1,0 +1,49 @@
+# Crossplane Helm values
+# Chart: https://charts.crossplane.io/stable
+# Version defined in config/platform-params.yaml
+
+# Resource configuration
+resourcesCrossplane:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+resourcesRBACManager:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+# Deployment configuration
+replicas: 1
+
+# Pod scheduling - use ARM64 nodes (Graviton)
+nodeSelector:
+  kubernetes.io/arch: arm64
+
+tolerations: []
+
+# Security context
+securityContextCrossplane:
+  runAsUser: 65532
+  runAsGroup: 65532
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+
+# Metrics
+metrics:
+  enabled: true
+
+# Webhooks
+webhooks:
+  enabled: true
+
+# Provider package cache
+packageCache:
+  sizeLimit: 5Gi
+  pvc: ""
