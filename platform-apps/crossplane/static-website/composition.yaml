@@ -28,16 +28,8 @@ spec:
     apiVersion: platform.darede.io/v1alpha1
     kind: XStaticWebsite
   
-  # Patch sets for common transformations
-  patchSets:
-    - name: common-tags
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.siteName
-          toFieldPath: spec.forProvider.tags.Site
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.environment
-          toFieldPath: spec.forProvider.tags.Environment
+  # Note: patchSets removed in Crossplane v2 - patches now inline in resources
+  # See: https://docs.crossplane.io/v2.0/guides/upgrade-to-crossplane-v2
 
   resources:
     # 1. S3 Bucket
