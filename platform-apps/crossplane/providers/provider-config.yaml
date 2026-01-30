@@ -1,0 +1,13 @@
+# ProviderConfig for AWS Providers
+# Uses IRSA (IAM Roles for Service Accounts) for authentication
+# ServiceAccount "provider-aws" created by Terraform with IRSA annotation
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"  # After Providers
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  credentials:
+    source: IRSA
