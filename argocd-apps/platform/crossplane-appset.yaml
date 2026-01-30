@@ -85,6 +85,7 @@ spec:
             maxDuration: 5m
       
       # Crossplane CRDs can take time to reconcile
+      # Ignore Provider status to avoid ArgoCD health check bugs
       ignoreDifferences:
         - group: apiextensions.crossplane.io
           kind: CompositeResourceDefinition
@@ -93,4 +94,12 @@ spec:
         - group: pkg.crossplane.io
           kind: Provider
           jsonPointers:
-            - /spec/package
+            - /status
+        - group: pkg.crossplane.io
+          kind: DeploymentRuntimeConfig
+          jsonPointers:
+            - /status
+        - group: pkg.crossplane.io
+          kind: ProviderRevision
+          jsonPointers:
+            - /status
