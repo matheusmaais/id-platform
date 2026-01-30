@@ -49,6 +49,13 @@ spec:
           targetRevision: '{{.repository.branch}}'
           ref: values
         
+        # Crossplane Functions
+        - repoURL: '{{.repository.url}}'
+          targetRevision: '{{.repository.branch}}'
+          path: platform-apps/crossplane/functions
+          directory:
+            recurse: true
+        
         # Provider configs and XRDs (non-Helm manifests)
         - repoURL: '{{.repository.url}}'
           targetRevision: '{{.repository.branch}}'

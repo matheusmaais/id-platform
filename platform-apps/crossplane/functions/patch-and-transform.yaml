@@ -1,0 +1,13 @@
+# Crossplane Function: Patch and Transform
+# Required for Compositions in Crossplane v2+
+#
+# This function replaces the legacy "mode: Resources" with patches
+# Now must use "mode: Pipeline" with this function
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-patch-and-transform
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"  # Before Compositions
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-patch-and-transform:v0.8.2
