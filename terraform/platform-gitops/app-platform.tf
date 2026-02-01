@@ -58,6 +58,8 @@ resource "kubectl_manifest" "apps_project" {
         { group = "policy", kind = "PodDisruptionBudget" },
         { group = "monitoring.coreos.com", kind = "ServiceMonitor" },
         { group = "monitoring.coreos.com", kind = "PodMonitor" },
+        # Crossplane Claims (for Static Website template)
+        { group = "platform.darede.io", kind = "StaticWebsite" },
       ]
 
       roles = [
