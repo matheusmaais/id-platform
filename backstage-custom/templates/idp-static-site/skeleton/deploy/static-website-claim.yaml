@@ -13,7 +13,6 @@ metadata:
     app.kubernetes.io/managed-by: crossplane
 spec:
   siteName: ${{ values.name }}
-  environment: ${{ values.environment }}
   region: ${{ values.awsRegion }}
   priceClass: ${{ values.priceClass }}
   indexDocument: index.html

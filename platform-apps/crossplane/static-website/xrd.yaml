@@ -40,17 +40,9 @@ spec:
               properties:
                 siteName:
                   type: string
-                  description: Name of the static website (used in bucket name and tags)
+                  description: Name of the static website (used in bucket name with idp- prefix)
                   pattern: '^[a-z][a-z0-9-]*$'
                   maxLength: 32
-                environment:
-                  type: string
-                  description: Environment (dev, staging, prod)
-                  default: dev
-                  enum:
-                    - dev
-                    - staging
-                    - prod
                 region:
                   type: string
                   description: AWS region for S3 bucket

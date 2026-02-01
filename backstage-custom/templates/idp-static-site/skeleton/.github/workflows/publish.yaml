@@ -10,11 +10,10 @@ on:
 env:
   # Site configuration (from template)
   SITE_NAME: ${{ values.name }}
-  ENVIRONMENT: ${{ values.environment }}
   AWS_REGION: ${{ values.awsRegion }}
   
-  # Bucket name follows convention: {siteName}-static-{environment}
-  BUCKET_NAME: ${{ values.name }}-static-${{ values.environment }}
+  # Bucket name follows convention: idp-{siteName}-static
+  BUCKET_NAME: idp-${{ values.name }}-static
 
 jobs:
   publish:

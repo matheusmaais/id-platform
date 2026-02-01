@@ -6,7 +6,7 @@ ${{ values.description }}
 
 This static website is hosted on AWS with the following components:
 
-- **S3 Bucket**: `${{ values.name }}-static-${{ values.environment }}` - Stores the website files
+- **S3 Bucket**: `idp-${{ values.name }}-static` - Stores the website files
 - **CloudFront**: CDN distribution with global edge locations
 - **Origin Access Control**: Secures S3 access (bucket is private)
 
@@ -136,7 +136,7 @@ kubectl describe staticwebsite ${{ values.name }} -n ${{ values.name }}
 The bucket policy might not be applied yet. Verify OAC configuration:
 
 ```bash
-aws s3api get-bucket-policy --bucket ${{ values.name }}-static-${{ values.environment }}
+aws s3api get-bucket-policy --bucket idp-${{ values.name }}-static
 ```
 
 ## Links

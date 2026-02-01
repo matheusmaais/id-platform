@@ -15,7 +15,7 @@ metadata:
     crossplane.io/claim-namespace: ${{ values.name }}
     
     # AWS resource tags for discovery
-    aws.amazon.com/s3-bucket: ${{ values.name }}-static-${{ values.environment }}
+    aws.amazon.com/s3-bucket: idp-${{ values.name }}-static
     
   links:
     - url: https://github.com/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}/actions
@@ -24,7 +24,7 @@ metadata:
     - url: https://argocd.${{ values.domain }}/applications/${{ values.repoPrefix }}${{ values.name }}
       title: ArgoCD
       icon: web
-    - url: https://console.aws.amazon.com/s3/buckets/${{ values.name }}-static-${{ values.environment }}
+    - url: https://console.aws.amazon.com/s3/buckets/idp-${{ values.name }}-static
       title: S3 Bucket
       icon: cloud
     - url: https://console.aws.amazon.com/cloudfront/home
