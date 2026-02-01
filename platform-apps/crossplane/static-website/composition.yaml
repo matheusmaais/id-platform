@@ -53,15 +53,14 @@ spec:
                     providerConfigRef:
                       name: default
                 patches:
-                  # Dynamic bucket name: {siteName}-static-{environment}
+                  # Dynamic bucket name: idp-{siteName}-static
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s"
+                        fmt: "idp-%s-static"
                     toFieldPath: metadata.name
                   - type: FromCompositeFieldPath
                     fromFieldPath: spec.region
@@ -69,9 +68,6 @@ spec:
                   - type: FromCompositeFieldPath
                     fromFieldPath: spec.siteName
                     toFieldPath: spec.forProvider.tags.Site
-                  - type: FromCompositeFieldPath
-                    fromFieldPath: spec.environment
-                    toFieldPath: spec.forProvider.tags.Environment
                   # Export bucket name to status
                   - type: ToCompositeFieldPath
                     fromFieldPath: metadata.name
@@ -103,19 +99,17 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-pab"
+                        fmt: "idp-%s-static-pab"
                     toFieldPath: metadata.name
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s"
+                        fmt: "idp-%s-static"
                     toFieldPath: spec.forProvider.bucketRef.name
                 readinessChecks:
                   - type: MatchCondition
@@ -139,19 +133,17 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-ownership"
+                        fmt: "idp-%s-static-ownership"
                     toFieldPath: metadata.name
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s"
+                        fmt: "idp-%s-static"
                     toFieldPath: spec.forProvider.bucketRef.name
                 readinessChecks:
                   - type: MatchCondition
@@ -177,19 +169,17 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-oac"
+                        fmt: "idp-%s-static-oac"
                     toFieldPath: metadata.name
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-oac"
+                        fmt: "idp-%s-static-oac"
                     toFieldPath: spec.forProvider.name
                   - type: FromCompositeFieldPath
                     fromFieldPath: spec.region
@@ -265,10 +255,9 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-cf"
+                        fmt: "idp-%s-static-cf"
                     toFieldPath: metadata.name
                   # Region
                   - type: FromCompositeFieldPath
@@ -287,49 +276,42 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "s3-%s-static-%s"
+                        fmt: "s3-idp-%s-static"
                     toFieldPath: spec.forProvider.origin[0].originId
                   # Origin domain name (dynamic with region)
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                         - fromFieldPath: spec.region
                       strategy: string
                       string:
-                        fmt: "%s-static-%s.s3.%s.amazonaws.com"
+                        fmt: "idp-%s-static.s3.%s.amazonaws.com"
                     toFieldPath: spec.forProvider.origin[0].domainName
                   # Target origin ID for cache behavior
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "s3-%s-static-%s"
+                        fmt: "s3-idp-%s-static"
                     toFieldPath: spec.forProvider.defaultCacheBehavior[0].targetOriginId
                   # OAC reference
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-oac"
+                        fmt: "idp-%s-static-oac"
                     toFieldPath: spec.forProvider.origin[0].originAccessControlIdRef.name
                   # Tags
                   - type: FromCompositeFieldPath
                     fromFieldPath: spec.siteName
                     toFieldPath: spec.forProvider.tags.Site
-                  - type: FromCompositeFieldPath
-                    fromFieldPath: spec.environment
-                    toFieldPath: spec.forProvider.tags.Environment
                   # Export to status
                   - type: ToCompositeFieldPath
                     fromFieldPath: status.atProvider.id
@@ -367,19 +349,17 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s-policy"
+                        fmt: "idp-%s-static-policy"
                     toFieldPath: metadata.name
                   - type: CombineFromComposite
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                       strategy: string
                       string:
-                        fmt: "%s-static-%s"
+                        fmt: "idp-%s-static"
                     toFieldPath: spec.forProvider.bucketRef.name
                   - type: FromCompositeFieldPath
                     fromFieldPath: spec.region
@@ -389,7 +369,6 @@ spec:
                     combine:
                       variables:
                         - fromFieldPath: spec.siteName
-                        - fromFieldPath: spec.environment
                         - fromFieldPath: status.distributionArn
                       strategy: string
                       string:
