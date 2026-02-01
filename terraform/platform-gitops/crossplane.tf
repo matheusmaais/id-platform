@@ -92,8 +92,8 @@ data "aws_iam_policy_document" "crossplane" {
       "s3:HeadBucket"
     ]
     resources = [
-      "arn:aws:s3:::*-static-${local.environment}",
-      "arn:aws:s3:::*-static-${local.environment}/*"
+      "arn:aws:s3:::idp-*-static",
+      "arn:aws:s3:::idp-*-static/*"
     ]
   }
 
