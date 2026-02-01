@@ -88,6 +88,14 @@ data "aws_iam_policy_document" "crossplane" {
       "s3:PutBucketAcl",
       "s3:GetBucketOwnershipControls",
       "s3:PutBucketOwnershipControls",
+      "s3:GetAccelerateConfiguration",
+      "s3:PutAccelerateConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:PutLifecycleConfiguration",
+      "s3:GetReplicationConfiguration",
+      "s3:PutReplicationConfiguration",
+      "s3:GetBucketLogging",
+      "s3:PutBucketLogging",
       "s3:ListBucket",
       "s3:HeadBucket"
     ]
