@@ -298,7 +298,7 @@ spec:
                       strategy: string
                       string:
                         fmt: "s3-idp-%s-static"
-                    toFieldPath: spec.forProvider.defaultCacheBehavior[0].targetOriginId
+                    toFieldPath: spec.forProvider.defaultCacheBehavior.targetOriginId
                   # OAC reference
                   - type: CombineFromComposite
                     combine:
