@@ -210,27 +210,27 @@ spec:
                         - connectionAttempts: 3
                           connectionTimeout: 10
                           s3OriginConfig:
-                            originAccessIdentity: ""  # Empty for OAC
+                            - originAccessIdentity: ""  # Empty for OAC
                       
                       defaultCacheBehavior:
-                        allowedMethods:
-                          - GET
-                          - HEAD
-                          - OPTIONS
-                        cachedMethods:
-                          - GET
-                          - HEAD
-                        compress: true
-                        viewerProtocolPolicy: redirect-to-https
-                        # AWS Managed CachingOptimized policy
-                        cachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
+                        - allowedMethods:
+                            - GET
+                            - HEAD
+                            - OPTIONS
+                          cachedMethods:
+                            - GET
+                            - HEAD
+                          compress: true
+                          viewerProtocolPolicy: redirect-to-https
+                          # AWS Managed CachingOptimized policy
+                          cachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
                           
                       restrictions:
-                        geoRestriction:
-                          restrictionType: none
+                        - geoRestriction:
+                            - restrictionType: none
                       
                       viewerCertificate:
-                        cloudfrontDefaultCertificate: true
+                        - cloudfrontDefaultCertificate: true
                       
                       # SPA support: redirect 403/404 to index.html
                       customErrorResponse:
