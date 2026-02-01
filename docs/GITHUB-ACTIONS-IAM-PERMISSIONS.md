@@ -219,6 +219,60 @@ URL: https://d1234abcd5678.cloudfront.net
 ----------------------------------------
 ```
 
+## Common Issues
+
+### Error: "Could not assume role with OIDC: Request ARN is invalid"
+
+**Symptoms:**
+```
+Error: Could not assume role with OIDC: Request ARN is invalid
+```
+
+**Root Cause:**
+The workflow used `${{ env.AWS_ACCOUNT_ID }}` which is NOT interpolated by Backstage during template rendering. This results in GitHub Actions trying to assume a malformed ARN.
+
+**Example of Wrong Pattern:**
+```yaml
+# ❌ WRONG - Backstage doesn't interpolate env.* during template creation
+env:
+  AWS_ACCOUNT_ID: ${{ values.awsAccountId }}  # This becomes "948881762705"
+
+jobs:
+  publish:
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # This stays as literal "${{ env.AWS_ACCOUNT_ID }}" in generated file!
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/...
+```
+
+**Solution:**
+Use `${{ values.awsAccountId }}` directly (Backstage interpolates `values.*` during template rendering):
+
+```yaml
+# ✅ CORRECT - Backstage interpolates values.* during scaffold
+jobs:
+  publish:
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Backstage replaces this with "arn:aws:iam::948881762705:role/..."
+          role-to-assume: arn:aws:iam::${{ values.awsAccountId }}:role/${{ values.githubActionsRoleName }}
+```
+
+**How Backstage Template Interpolation Works:**
+1. **Template Time (Backstage)**: `${{ values.* }}` → Replaced with actual values
+2. **Runtime (GitHub Actions)**: `${{ env.* }}`, `${{ github.* }}` → Evaluated by GitHub
+
+**Verification:**
+After creating a site via Backstage, check the generated `.github/workflows/publish.yaml` in the created repo:
+```bash
+# Should show hardcoded ARN like:
+role-to-assume: arn:aws:iam::948881762705:role/github-actions-ecr-push
+```
+
+---
+
 ## Troubleshooting
 
 ### Error: "Access Denied" on S3 Sync
