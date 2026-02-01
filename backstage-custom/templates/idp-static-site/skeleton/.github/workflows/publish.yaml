@@ -12,7 +12,6 @@ env:
   SITE_NAME: ${{ values.name }}
   ENVIRONMENT: ${{ values.environment }}
   AWS_REGION: ${{ values.awsRegion }}
-  AWS_ACCOUNT_ID: ${{ values.awsAccountId }}
   
   # Bucket name follows convention: {siteName}-static-{environment}
   BUCKET_NAME: ${{ values.name }}-static-${{ values.environment }}
@@ -33,8 +32,8 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ values.githubActionsRoleName }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ values.awsAccountId }}:role/${{ values.githubActionsRoleName }}
+          aws-region: {% raw %}${{ env.AWS_REGION }}{% endraw %}
       
       - name: Wait for bucket to exist
         id: wait-bucket
