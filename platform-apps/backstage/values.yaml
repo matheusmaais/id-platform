@@ -77,6 +77,7 @@ backstage:
           githubAppName: ${GITHUB_APP_NAME}
           githubActionsRoleName: ${GITHUB_ACTIONS_ROLE_NAME}
           domain: ${DOMAIN}
+          environment: ${ENVIRONMENT}
           albGroupName: ${ALB_SHARED_GROUP_NAME}
           albScheme: ${ALB_SCHEME}
           albTargetType: ${ALB_TARGET_TYPE}
@@ -85,6 +86,7 @@ backstage:
           ecrRegistry: ${ECR_REGISTRY}
           awsRegion: ${AWS_REGION}
           awsAccountId: ${AWS_ACCOUNT_ID}
+          environment: ${ENVIRONMENT}
           clusterName: ${CLUSTER_NAME}
           manifestsPath: ${APPS_MANIFESTS_PATH}
           appNamespaceStrategy: ${APPS_NAMESPACE_STRATEGY}
