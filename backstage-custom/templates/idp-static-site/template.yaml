@@ -12,7 +12,7 @@ metadata:
 spec:
   owner: platform-team
   type: website
-  
+
   parameters:
     - title: Website Details
       required:
@@ -39,7 +39,7 @@ spec:
           ui:options:
             catalogFilter:
               kind: [User, Group]
-    
+
     - title: Configuration
       properties:
         priceClass:
@@ -55,7 +55,7 @@ spec:
             - 'NA, EU, Asia, Middle East, Africa'
             - 'All edge locations (global)'
           default: PriceClass_100
-  
+
   steps:
     # Step 1: Fetch template skeleton
     - id: fetch-base
@@ -77,7 +77,7 @@ spec:
           awsAccountId: ${{ environment.parameters.awsAccountId }}
           githubActionsRoleName: ${{ environment.parameters.githubActionsRoleName }}
           environment: ${{ environment.parameters.environment }}
-    
+
     # Step 2: Create GitHub repository
     - id: publish
       name: Publish to GitHub
@@ -88,7 +88,7 @@ spec:
         repoVisibility: ${{ environment.parameters.repoVisibility }}
         defaultBranch: main
         protectDefaultBranch: false
-    
+
     # Step 3: Register component in catalog
     - id: register
       name: Register Component
@@ -96,7 +96,7 @@ spec:
       input:
         repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
         catalogInfoPath: /catalog-info.yaml
-  
+
   output:
     links:
       - title: Repository

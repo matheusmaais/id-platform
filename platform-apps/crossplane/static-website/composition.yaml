@@ -393,6 +393,8 @@ spec:
                             ]
                           }
                     toFieldPath: spec.forProvider.policy
+                    policy:
+                      fromFieldPath: Required  # Only create when distributionArn is available
                 readinessChecks:
                   - type: MatchCondition
                     matchCondition:

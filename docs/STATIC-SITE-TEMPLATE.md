@@ -139,7 +139,7 @@ If you manage the role via Terraform, add this policy:
 resource "aws_iam_policy" "github_actions_static_sites" {
   name        = "github-actions-static-sites"
   description = "Permissions for GitHub Actions to deploy static sites"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
