@@ -71,7 +71,7 @@ jobs:
       
       - name: Get CloudFront Distribution ID
         id: get-distribution
-        if: steps.wait-bucket.outputs.bucket_ready == 'true'
+        if: {% raw %}steps.wait-bucket.outputs.bucket_ready == 'true'{% endraw %}
         run: |
           # Find CloudFront distribution by S3 origin
           DIST_ID=$(aws cloudfront list-distributions \
@@ -80,18 +80,18 @@ jobs:
           
           if [ "$DIST_ID" != "None" ] && [ -n "$DIST_ID" ]; then
             echo "Found distribution: ${DIST_ID}"
-            echo "distribution_id=${DIST_ID}" >> $GITHUB_OUTPUT
+            echo "distribution_id=${DIST_ID}" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
           else
             echo "CloudFront distribution not found yet (may still be provisioning)"
-            echo "distribution_id=" >> $GITHUB_OUTPUT
+            echo "distribution_id=" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
           fi
       
       - name: Invalidate CloudFront cache
-        if: steps.get-distribution.outputs.distribution_id != ''
+        if: {% raw %}steps.get-distribution.outputs.distribution_id != ''{% endraw %}
         run: |
           echo "Creating CloudFront invalidation..."
           INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id "${{ steps.get-distribution.outputs.distribution_id }}" \
+            --distribution-id "{% raw %}${{ steps.get-distribution.outputs.distribution_id }}{% endraw %}" \
             --paths "/*" \
             --query "Invalidation.Id" \
             --output text)
