@@ -1,15 +1,18 @@
 ################################################################################
 # Crossplane AWS Provider IAM Role (IRSA)
-# 
-# The AWS Provider creates ServiceAccounts dynamically with names like:
-# - crossplane-provider-aws-*
-# We use StringLike to match this pattern.
+#
+# DeploymentRuntimeConfig uses serviceAccountName: provider-aws (our SA).
+# Trust policy must allow that SA; wildcard covers any future provider SA names.
 ################################################################################
 
 locals {
   crossplane = {
-    namespace                = "crossplane-system"
-    provider_service_account = "crossplane-provider-aws-*"
+    namespace = "crossplane-system"
+    # SA used by DeploymentRuntimeConfig in platform-apps/crossplane/providers/aws-provider.yaml
+    provider_sa_names = [
+      "provider-aws",              # Our configured SA (Terraform-created)
+      "crossplane-provider-aws-*",  # Fallback if providers run with default SA names
+    ]
   }
 }
 
@@ -24,11 +27,10 @@ data "aws_iam_policy_document" "crossplane_assume_role" {
 
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
-    # Use StringLike for wildcard matching of provider SA name
     condition {
       test     = "StringLike"
       variable = "${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:sub"
-      values   = ["system:serviceaccount:${local.crossplane.namespace}:${local.crossplane.provider_service_account}"]
+      values   = [for sa in local.crossplane.provider_sa_names : "system:serviceaccount:${local.crossplane.namespace}:${sa}"]
     }
 
     condition {
@@ -53,7 +55,7 @@ resource "aws_iam_role" "crossplane" {
 
 ################################################################################
 # Crossplane IAM Policy
-# 
+#
 # Scoped permissions for Static Website resources:
 # - S3: Bucket creation and management
 # - CloudFront: Distribution creation and management

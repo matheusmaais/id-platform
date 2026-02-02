@@ -95,7 +95,44 @@ kubectl logs -n backstage backstage-xxx | grep "Listening on"
 
 ---
 
-### Issue 3: Backstage Not Accessible via HTTPS
+### Issue 3: ArgoCD não pegou a nova app (criada no Backstage)
+
+**Symptoms:**
+- Você criou uma app Node.js (ou Static Site) no Backstage; GitHub e CI foram criados.
+- No ArgoCD não aparece nenhuma Application para esse repo (app não foi descoberta).
+
+**Checks rápidos:**
+
+1. **Nome do repo** — O ApplicationSet só descobre repos que batem com `^idp-.*` e que tenham o diretório `deploy/`. O repo precisa ser `idp-<nome>` (ex.: `idp-myapp`). Se o nome não começar com `idp-`, o ArgoCD não lista.
+
+2. **Diretório `deploy/`** — O filtro usa `pathsExist: ["deploy"]`. Confirme que no **branch default** (ex.: `main`) existe o diretório `deploy/` com os manifests. Se o primeiro commit não tiver `deploy/`, o ApplicationSet ignora o repo.
+
+3. **Forçar reconciliação do ApplicationSet** — O controller pode levar até ~1 min para rodar de novo. Para não esperar:
+
+   ```bash
+   # Forçar refresh do ApplicationSet "workloads"
+   kubectl annotate applicationset workloads -n argocd argocd.argoproj.io/refresh=hard --overwrite
+   ```
+
+   Ou com ArgoCD CLI: `argocd appset get workloads --refresh` (se tiver `argocd` configurado).
+
+4. **Logs do ApplicationSet controller** — Ver se há erro ao listar repos ou ao aplicar o filtro:
+
+   ```bash
+   kubectl logs -n argocd -l app.kubernetes.io/name=argocd-applicationset-controller --tail=100
+   ```
+
+   Procure por erros de GitHub (401, 403, 404) ou mensagens como `generated N applications`.
+
+5. **Token no cluster vem do Terraform** — O token do SCM Provider está no secret `github-scm-token` (namespace argocd), criado pelo Terraform a partir de **var.github_token**. O `make apply-gitops` usa `GITHUB_TOKEN` do `.env` → `TF_VAR_github_token`. **Se você rotacionou o token:** atualize o `.env` com o novo `GITHUB_TOKEN` e rode `make apply-gitops` (ou `terraform apply` em `terraform/platform-gitops`) para atualizar o secret no cluster. Sem isso, o ArgoCD continua usando o token antigo e pode passar a listar 0 repos (401/403).
+
+6. **Bug conhecido: filtro pathsExist** — Em alguns cenários o filtro `pathsExist: ["deploy"]` faz o SCM Provider retornar **0 repos** (ex.: 404 na checagem de path). Se o token está correto e o repo tem `deploy/` mas o ApplicationSet continua gerando 0 applications, desabilite o filtro para testar: em `terraform/platform-gitops` rode `terraform apply -var="apps_scm_paths_exist_filter=false"` (ou crie `terraform.tfvars` com `apps_scm_paths_exist_filter = false`). Depois force refresh: `kubectl annotate applicationset workloads -n argocd argocd.argoproj.io/refresh=hard --overwrite`. Se as apps voltarem a aparecer, a causa é o pathsExist; pode deixar o filtro desligado (todos os repos `idp-*` da org serão descobertos) ou acompanhar correções no ArgoCD.
+
+**Resumo:** Confirme repo `idp-*`, `deploy/` no branch default, **token no cluster atualizado via terraform apply**, force o refresh do ApplicationSet. Se ainda 0 apps, teste com `apps_scm_paths_exist_filter=false`.
+
+---
+
+### Issue 4: Backstage Not Accessible via HTTPS
 
 **Symptoms:**
 ```bash
@@ -149,7 +186,7 @@ dig backstage.timedevops.click +short
 
 ---
 
-### Issue 4: PostgreSQL Persistence Issues
+### Issue 5: PostgreSQL Persistence Issues
 
 **Symptoms:**
 ```bash
@@ -180,7 +217,7 @@ postgresql:
 
 ---
 
-### Issue 5: Backstage Catalog Not Loading
+### Issue 6: Backstage Catalog Not Loading
 
 **Symptoms:**
 - Backstage UI loads but catalog is empty
@@ -214,7 +251,7 @@ curl http://localhost:7007/api/catalog/entities
 
 ---
 
-### Issue 6: Cognito OIDC Authentication Not Working
+### Issue 7: Cognito OIDC Authentication Not Working
 
 **Symptoms:**
 - Login button doesn't appear
@@ -241,6 +278,77 @@ kubectl get configmap backstage-app-config -n backstage -o yaml | grep -A 10 "au
 4. **Check Backend Logs:**
 ```bash
 kubectl logs -n backstage <backstage-pod> | grep -i "auth\|oidc\|cognito"
+```
+
+---
+
+### Issue 8: StaticWebsite / CDN — Sync OK but S3 not created
+
+**Symptoms:**
+- ArgoCD Application do static site está Synced.
+- O claim `StaticWebsite` existe no namespace da app.
+- S3 (e CloudFront) não foram provisionados pelo Crossplane.
+
+**Diagnóstico (rode no cluster e use a saída para achar a causa):**
+
+1. **Claim e Composite:**
+```bash
+# Listar claims StaticWebsite (troque o namespace pelo da sua app, ex.: daredeidpmonday1)
+kubectl get staticwebsite -A
+kubectl get xstaticwebsite -A
+
+# Detalhes do claim (nome do recurso que você viu no erro, ex.: daredeidpmonday1)
+kubectl describe staticwebsite <nome-do-claim> -n <namespace-da-app>
+# Ver condições (Ready, Synced) e events no final
+```
+
+2. **XRD e Composition:**
+```bash
+kubectl get xrd xstaticwebsites.platform.darede.io
+kubectl get composition
+kubectl get compositionrevision
+# Se não houver Composition/CompositionRevision, a app Crossplane pode estar OutOfSync ou o path não foi aplicado
+```
+
+3. **ProviderConfig e Providers:**
+```bash
+kubectl get providerconfig -A
+kubectl get provider -n crossplane-system
+kubectl get providerrevision -n crossplane-system
+# ProviderConfig "default" (aws.upbound.io) deve existir; providers provider-aws-s3 e provider-aws-cloudfront INSTALLED/HEALTHY
+```
+
+4. **Recursos S3/CloudFront (Crossplane):**
+```bash
+kubectl get bucket -A
+kubectl get distribution -A
+# Se vazios, a Composition não está criando ou o provider não está aplicando
+```
+
+5. **Events e logs Crossplane:**
+```bash
+kubectl get events -n <namespace-da-app> --sort-by='.lastTimestamp' | tail -30
+kubectl logs -n crossplane-system -l pkg.crossplane.io/provider=provider-aws-s3 --tail=50
+```
+
+**Causas comuns:**
+
+| Causa | O que ver | Ação |
+|-------|-----------|------|
+| **IRSA 403** (causa raiz comum) | Bucket/Distribution com `ReconcileError`, mensagem `AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity` | A role IAM deve confiar na SA usada pelo provider. O DeploymentRuntimeConfig usa `serviceAccountName: provider-aws`; a trust policy em `terraform/platform-gitops/crossplane.tf` deve incluir `provider-aws` (não só `crossplane-provider-aws-*`). Rode `terraform apply` no módulo platform-gitops. |
+| **Region obrigatório no S3** | Events no XStaticWebsite: `BucketPublicAccessBlock`/`BucketOwnershipControls` "invalid: spec.forProvider.region: Required value" | A Composition deve aplicar `spec.region` nos recursos S3 (BucketPublicAccessBlock, BucketOwnershipControls). Corrigido em `platform-apps/crossplane/static-website/composition.yaml` com patch `FromCompositeFieldPath: spec.region → spec.forProvider.region`. Sync da app Crossplane no ArgoCD. |
+| App Crossplane não Synced | XRD ou Composition ausentes | No ArgoCD: Sync da application `crossplane` (namespace argocd). |
+| ProviderConfig ausente | `kubectl get providerconfig` vazio | A app Crossplane aplica `platform-apps/crossplane/providers/provider-config.yaml` em `crossplane-system`; confira que o path está no Application e deu Sync. |
+| Provider não HEALTHY | `kubectl get provider` mostra não HEALTHY | Ver IRSA: `kubectl get sa provider-aws -n crossplane-system -o yaml` (annotation `eks.amazonaws.com/role-arn`). Ver logs do provider. |
+| siteName inválido no claim | Condição no claim com erro de validação | O XRD exige `spec.siteName` com pattern `^[a-z][a-z0-9-]*$` e maxLength 32. Corrija o manifest no repo da app e faça Sync de novo. |
+| Composition não usada | XStaticWebsite existe mas sem recursos composto | Verifique se existe uma Composition com `compositeTypeRef: XStaticWebsite` e label `crossplane.io/xrd: xstaticwebsites.platform.darede.io`. |
+
+**Validação após correção:**
+```bash
+kubectl get staticwebsite -A
+kubectl get bucket -A
+kubectl get distribution -A
+# Bucket e Distribution devem aparecer e ficar Ready
 ```
 
 ---

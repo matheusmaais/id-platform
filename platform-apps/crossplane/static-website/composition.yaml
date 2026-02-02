@@ -27,11 +27,11 @@ spec:
   compositeTypeRef:
     apiVersion: platform.darede.io/v1alpha1
     kind: XStaticWebsite
-  
+
   # Crossplane v2 requires mode: Pipeline with function-patch-and-transform
   # Legacy "mode: Resources" was removed in v2.0
   mode: Pipeline
-  
+
   pipeline:
     - step: patch-and-transform
       functionRef:
@@ -80,7 +80,7 @@ spec:
                     matchCondition:
                       type: Ready
                       status: "True"
-          
+
               # 2. S3 Bucket Public Access Block
               - name: bucket-public-access-block
                 base:
@@ -111,12 +111,15 @@ spec:
                       string:
                         fmt: "idp-%s-static"
                     toFieldPath: spec.forProvider.bucketRef.name
+                  - type: FromCompositeFieldPath
+                    fromFieldPath: spec.region
+                    toFieldPath: spec.forProvider.region
                 readinessChecks:
                   - type: MatchCondition
                     matchCondition:
                       type: Ready
                       status: "True"
-          
+
               # 3. S3 Bucket Ownership Controls
               - name: bucket-ownership
                 base:
@@ -145,12 +148,15 @@ spec:
                       string:
                         fmt: "idp-%s-static"
                     toFieldPath: spec.forProvider.bucketRef.name
+                  - type: FromCompositeFieldPath
+                    fromFieldPath: spec.region
+                    toFieldPath: spec.forProvider.region
                 readinessChecks:
                   - type: MatchCondition
                     matchCondition:
                       type: Ready
                       status: "True"
-          
+
               # 4. CloudFront Origin Access Control
               - name: cloudfront-oac
                 base:
@@ -192,7 +198,7 @@ spec:
                     matchCondition:
                       type: Ready
                       status: "True"
-          
+
               # 5. CloudFront Distribution
               - name: cloudfront-distribution
                 base:
@@ -205,13 +211,13 @@ spec:
                       httpVersion: http2and3
                       priceClass: PriceClass_100
                       defaultRootObject: index.html
-                      
+
                       origin:
                         - connectionAttempts: 3
                           connectionTimeout: 10
                           s3OriginConfig:
                             originAccessIdentity: ""  # Empty for OAC
-                      
+
                       defaultCacheBehavior:
                         allowedMethods:
                           - GET
@@ -224,14 +230,14 @@ spec:
                         viewerProtocolPolicy: redirect-to-https
                         # AWS Managed CachingOptimized policy
                         cachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6"
-                          
+
                       restrictions:
                         geoRestriction:
                           restrictionType: none
-                      
+
                       viewerCertificate:
                         cloudfrontDefaultCertificate: true
-                      
+
                       # SPA support: redirect 403/404 to index.html
                       customErrorResponse:
                         - errorCode: 403
@@ -242,11 +248,11 @@ spec:
                           responseCode: 200
                           responsePagePath: /index.html
                           errorCachingMinTtl: 10
-                      
+
                       tags:
                         ManagedBy: crossplane
                         Platform: idp
-                        
+
                     providerConfigRef:
                       name: default
                 patches:
@@ -332,7 +338,7 @@ spec:
                     matchCondition:
                       type: Ready
                       status: "True"
-          
+
               # 6. S3 Bucket Policy (allows CloudFront OAC access)
               # Note: Must be created after CloudFront to get distribution ARN
               - name: bucket-policy

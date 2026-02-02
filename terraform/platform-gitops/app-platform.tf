@@ -58,6 +58,8 @@ resource "kubectl_manifest" "apps_project" {
         { group = "policy", kind = "PodDisruptionBudget" },
         { group = "monitoring.coreos.com", kind = "ServiceMonitor" },
         { group = "monitoring.coreos.com", kind = "PodMonitor" },
+        # Crossplane claims for static site (S3 + CloudFront)
+        { group = "platform.darede.io", kind = "StaticWebsite" },
       ]
 
       roles = [
@@ -104,29 +106,32 @@ resource "kubectl_manifest" "workloads_appset" {
         goTemplateOptions = ["missingkey=error"]
         generators = [
           {
-            scmProvider = {
-              github = merge(
-                {
-                  organization  = local.github_org
-                  allBranches   = false
-                  cloneProtocol = "https"
-                },
-                local.github_app_enabled ? {
-                  appSecretName = kubernetes_secret.argocd_github_app_creds[0].metadata[0].name
-                  } : {
-                  tokenRef = {
-                    secretName = kubernetes_secret.argocd_scm_token.metadata[0].name
-                    key        = "token"
+            scmProvider = merge(
+              {
+                github = merge(
+                  {
+                    organization  = local.github_org
+                    allBranches   = false
+                    cloneProtocol = "https"
+                  },
+                  local.github_app_enabled ? {
+                    appSecretName = kubernetes_secret.argocd_github_app_creds[0].metadata[0].name
+                    } : {
+                    tokenRef = {
+                      secretName = kubernetes_secret.argocd_scm_token.metadata[0].name
+                      key        = "token"
+                    }
                   }
-                }
-              )
-              filters = [
-                {
-                  repositoryMatch = local.github_repo_regex
-                  pathsExist      = [local.apps_manifests_path]
-                }
-              ]
-            }
+                )
+                filters = [
+                  merge(
+                    { repositoryMatch = local.workloads_repo_regex },
+                    var.apps_scm_paths_exist_filter ? { pathsExist = [local.apps_manifests_path] } : {}
+                  )
+                ]
+              },
+              { requeueAfterSeconds = 120 }
+            )
           }
         ]
         template = {

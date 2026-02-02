@@ -15,6 +15,9 @@ locals {
   github_org                  = local.platform_config.github.org
   github_repo_prefix          = local.platform_config.github.appRepoPrefix
   github_repo_regex           = try(local.platform_config.github.repoRegex, "^${local.platform_config.github.appRepoPrefix}.*$")
+  # Exclude platform repo (idp-platform) from workload discovery. RE2-compatible: no lookahead;
+  # "platform" is 8 chars, so we match suffix 1-7 or 9+ chars to exclude only idp-platform.
+  workloads_repo_regex        = "^idp-(?:[a-z0-9-]{1,7}|[a-z0-9-]{9,})$"
   github_repo_visibility      = try(local.platform_config.github.appRepoVisibility, "private")
   github_scm_auth             = try(local.platform_config.github.scmAuth, "token")
   github_app_name             = try(local.platform_config.github.appName, "")

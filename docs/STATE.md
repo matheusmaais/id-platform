@@ -1,5 +1,7 @@
 # PLATFORM CANONICAL STATE
 
+**Troubleshooting:** Para diagnóstico de erros comuns (Backstage, ArgoCD, Crossplane/StaticWebsite, SSO) → [TROUBLESHOOTING-BACKSTAGE.md](TROUBLESHOOTING-BACKSTAGE.md)
+
 ## 🎯 FINAL OBJECTIVE
 Deliver a deterministic ZERO-to-FULLY-USABLE internal platform where:
 
@@ -401,6 +403,8 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-applicationset-controlle
    - Check deployment: `kubectl get app idp-hello -n argocd`
    - Test endpoint (if public): `https://hello.timedevops.click`
 
+**App offboarding (apagar recursos + app):** Ordem e o que é automático vs manual → [APP-OFFBOARDING-FLOW.md](APP-OFFBOARDING-FLOW.md)
+
 ### 📊 CONFIGURATION SCHEMA
 
 #### config/platform-params.yaml
@@ -586,7 +590,7 @@ make validate-new-app-flow APP=idp-myapp1
 
 ### 🚧 BLOCKED - TECHNICAL LIMITATION
 
-#### Backstage OIDC Authentication  
+#### Backstage OIDC Authentication
 - **Status**: ❌ BLOCKED - Incompatible package versions
 - **Root Cause #1**: Official Backstage image does NOT include auth provider plugins (RESOLVED - built custom image)
 - **Root Cause #2**: Package version incompatibility - `@backstage/backend-defaults@0.6.0` does NOT provide required core services
@@ -608,7 +612,7 @@ make validate-new-app-flow APP=idp-myapp1
 
 **TECHNICAL BLOCKER:**
 ```
-Error: Service or extension point dependencies of plugin 'catalog' are missing  
+Error: Service or extension point dependencies of plugin 'catalog' are missing
 Missing: serviceRef{core.permissionsRegistry}, serviceRef{core.auditor}
 
 Root Cause:
@@ -1100,7 +1104,7 @@ kubectl patch secret backstage-cognito -n backstage \
 
 **Next:** Test end-to-end Cognito login flow
 
-**Commits:** 
+**Commits:**
 - 356814b - "fix(backstage): enable OIDC sign-in page"
 - 5ceb601 - "fix(terraform): add COGNITO_ISSUER to Backstage secret"
 
@@ -1187,9 +1191,9 @@ curl -I https://backstage.timedevops.click
 ### 2026-01-27: Configuration Sources & Where to Edit ✅
 **Status:** ✅ DOCUMENTED (single source of truth, no duplication)
 
-**Rule:**  
-- **Sensitive only** in `.env`  
-- **Everything else** in `config/platform-params.yaml`  
+**Rule:**
+- **Sensitive only** in `.env`
+- **Everything else** in `config/platform-params.yaml`
 - **Terraform locals** read from `config/platform-params.yaml` (no hardcoded values)
 
 **Files to edit (ONLY these):**
@@ -1213,7 +1217,7 @@ curl -I https://backstage.timedevops.click
 - `terraform/platform-gitops/*.tf` values (derived from locals)
 - Makefile variables (reads config/.env)
 
-**Why:**  
+**Why:**
 Avoid duplicated values across `.env`, `locals`, and Terraform code.
 
 ### 2026-01-26: GitOps Apply ✅
@@ -1597,7 +1601,7 @@ kubectl get ingress -n argocd  # ✅ ALB: k8s-devplatform-*
 **Changes Made:**
 - `terraform/platform-gitops/aws-lb-controller.tf`: Replaced managed policy with inline policy containing full v2.11+ permissions
 - `terraform/platform-gitops/external-dns.tf`: Moved `ListResourceRecordSets` to global scope (required for zone discovery)
-- `terraform/platform-gitops/argocd.tf`: 
+- `terraform/platform-gitops/argocd.tf`:
   - Created `aws_security_group.argocd_alb` with HTTPS ingress
   - Added `aws_security_group_rule.argocd_alb_to_cluster` for ALB→cluster SG
   - Fixed ArgoCD params: `server.basehref = "/"`, `server.rootpath = ""`
