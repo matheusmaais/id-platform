@@ -150,29 +150,6 @@
             line-height: 1.8;
         }
 
-        .badges-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .badges-row a {
-            display: inline-block;
-            transition: transform 0.2s ease;
-        }
-
-        .badges-row a:hover {
-            transform: translateY(-2px);
-        }
-
-        .badges-row img {
-            height: 28px;
-            display: block;
-        }
-
         .info {
             margin-top: 50px;
             padding-top: 30px;
@@ -275,10 +252,6 @@
             .tech-badges img {
                 height: 22px;
             }
-
-            .badges-row img {
-                height: 24px;
-            }
         }
     </style>
 </head>
@@ -302,12 +275,6 @@
             Fui provisionado e orquestrado através de uma plataforma interna de desenvolvimento,
             com infraestrutura como código e implantação contínua totalmente automatizada.
         </p>
-
-        <div class="badges-row">
-            <a href="https://github.com/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}/actions/workflows/publish.yaml" target="_blank" rel="noopener noreferrer" title="Publish workflow status">
-                <img src="https://img.shields.io/github/actions/workflow/status/${{ values.githubOrg }}/${{ values.repoPrefix }}${{ values.name }}/publish.yaml?branch=main&style=flat-square&label=Publish" alt="Publish workflow status">
-            </a>
-        </div>
 
         <div class="info">
             <div class="info-grid">
