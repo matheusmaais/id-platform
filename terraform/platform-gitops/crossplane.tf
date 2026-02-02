@@ -66,38 +66,7 @@ data "aws_iam_policy_document" "crossplane" {
     sid    = "S3BucketManagement"
     effect = "Allow"
     actions = [
-      "s3:CreateBucket",
-      "s3:DeleteBucket",
-      "s3:GetBucketLocation",
-      "s3:GetBucketTagging",
-      "s3:PutBucketTagging",
-      "s3:GetBucketPolicy",
-      "s3:PutBucketPolicy",
-      "s3:DeleteBucketPolicy",
-      "s3:GetBucketPublicAccessBlock",
-      "s3:PutBucketPublicAccessBlock",
-      "s3:GetBucketVersioning",
-      "s3:PutBucketVersioning",
-      "s3:GetBucketCORS",
-      "s3:PutBucketCORS",
-      "s3:DeleteBucketCORS",
-      "s3:GetBucketWebsite",
-      "s3:PutBucketWebsite",
-      "s3:DeleteBucketWebsite",
-      "s3:GetBucketAcl",
-      "s3:PutBucketAcl",
-      "s3:GetBucketOwnershipControls",
-      "s3:PutBucketOwnershipControls",
-      "s3:GetAccelerateConfiguration",
-      "s3:PutAccelerateConfiguration",
-      "s3:GetLifecycleConfiguration",
-      "s3:PutLifecycleConfiguration",
-      "s3:GetReplicationConfiguration",
-      "s3:PutReplicationConfiguration",
-      "s3:GetBucketLogging",
-      "s3:PutBucketLogging",
-      "s3:ListBucket",
-      "s3:HeadBucket"
+      "s3:*"  # All S3 operations for managed buckets
     ]
     resources = [
       "arn:aws:s3:::idp-*-static",
