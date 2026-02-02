@@ -39,20 +39,20 @@ jobs:
         run: |
           echo "Waiting for bucket ${BUCKET_NAME} to be available..."
           for i in {1..30}; do
-            if aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
-              echo "Bucket ${BUCKET_NAME} is ready!"
-              echo "bucket_ready=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            echo "Attempt $i/30 - Bucket not ready yet, waiting 10s..."
-            sleep 10
+              if aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
+                  echo "Bucket ${BUCKET_NAME} is ready!"
+                  echo "bucket_ready=true" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
+                  exit 0
+              fi
+              echo "Attempt $i/30 - Bucket not ready yet, waiting 10s..."
+              sleep 10
           done
           echo "Bucket ${BUCKET_NAME} not available after 5 minutes"
-          echo "bucket_ready=false" >> $GITHUB_OUTPUT
+          echo "bucket_ready=false" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
           exit 1
       
       - name: Sync to S3
-        if: steps.wait-bucket.outputs.bucket_ready == 'true'
+        if: {% raw %}steps.wait-bucket.outputs.bucket_ready == 'true'{% endraw %}
         run: |
           echo "Syncing site/ to s3://${BUCKET_NAME}..."
           aws s3 sync site/ "s3://${BUCKET_NAME}" \
