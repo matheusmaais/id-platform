@@ -32,7 +32,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ values.awsAccountId }}:role/${{ values.githubActionsRoleName }}
-          aws-region: {% raw %}${{ env.AWS_REGION }}{% endraw %}
+          aws-region: ${{ env.AWS_REGION }}
       
       - name: Wait for bucket to exist
         id: wait-bucket
@@ -41,18 +41,18 @@ jobs:
           for i in {1..30}; do
               if aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
                   echo "Bucket ${BUCKET_NAME} is ready!"
-                  echo "bucket_ready=true" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
+                  echo "bucket_ready=true" >> $GITHUB_OUTPUT
                   exit 0
               fi
               echo "Attempt $i/30 - Bucket not ready yet, waiting 10s..."
               sleep 10
           done
           echo "Bucket ${BUCKET_NAME} not available after 5 minutes"
-          echo "bucket_ready=false" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
+          echo "bucket_ready=false" >> $GITHUB_OUTPUT
           exit 1
       
       - name: Sync to S3
-        if: {% raw %}steps.wait-bucket.outputs.bucket_ready == 'true'{% endraw %}
+        if: "steps.wait-bucket.outputs.bucket_ready == 'true'"
         run: |
           echo "Syncing site/ to s3://${BUCKET_NAME}..."
           aws s3 sync site/ "s3://${BUCKET_NAME}" \
@@ -71,7 +71,7 @@ jobs:
       
       - name: Get CloudFront Distribution ID
         id: get-distribution
-        if: {% raw %}steps.wait-bucket.outputs.bucket_ready == 'true'{% endraw %}
+        if: "steps.wait-bucket.outputs.bucket_ready == 'true'"
         run: |
           # Find CloudFront distribution by S3 origin
           DIST_ID=$(aws cloudfront list-distributions \
@@ -80,18 +80,18 @@ jobs:
           
           if [ "$DIST_ID" != "None" ] && [ -n "$DIST_ID" ]; then
             echo "Found distribution: ${DIST_ID}"
-            echo "distribution_id=${DIST_ID}" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
+            echo "distribution_id=${DIST_ID}" >> $GITHUB_OUTPUT
           else
             echo "CloudFront distribution not found yet (may still be provisioning)"
-            echo "distribution_id=" >> {% raw %}$GITHUB_OUTPUT{% endraw %}
+            echo "distribution_id=" >> $GITHUB_OUTPUT
           fi
       
       - name: Invalidate CloudFront cache
-        if: {% raw %}steps.get-distribution.outputs.distribution_id != ''{% endraw %}
+        if: "steps.get-distribution.outputs.distribution_id != ''"
         run: |
           echo "Creating CloudFront invalidation..."
           INVALIDATION_ID=$(aws cloudfront create-invalidation \
-            --distribution-id "{% raw %}${{ steps.get-distribution.outputs.distribution_id }}{% endraw %}" \
+            --distribution-id "${{ steps.get-distribution.outputs.distribution_id }}" \
             --paths "/*" \
             --query "Invalidation.Id" \
             --output text)
@@ -100,7 +100,7 @@ jobs:
           echo "Cache invalidation may take a few minutes to complete."
       
       - name: Print site URL
-        if: steps.get-distribution.outputs.distribution_id != ''
+        if: "steps.get-distribution.outputs.distribution_id != ''"
         run: |
           DOMAIN=$(aws cloudfront get-distribution \
             --id "${{ steps.get-distribution.outputs.distribution_id }}" \
