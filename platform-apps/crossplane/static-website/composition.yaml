@@ -383,7 +383,7 @@ spec:
                                   "Service": "cloudfront.amazonaws.com"
                                 },
                                 "Action": "s3:GetObject",
-                                "Resource": "arn:aws:s3:::%s-static-%s/*",
+                                "Resource": "arn:aws:s3:::idp-%s-static/*",
                                 "Condition": {
                                   "StringEquals": {
                                     "AWS:SourceArn": "%s"
