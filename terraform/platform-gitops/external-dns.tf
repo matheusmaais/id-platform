@@ -15,26 +15,26 @@ data "aws_iam_policy_document" "external_dns_assume_role" {
 
     condition {
       test     = "StringEquals"
-      variable = "${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:sub"
+      variable = "${replace(data.terraform_remote_state.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:sub"
       values   = ["system:serviceaccount:${local.external_dns.namespace}:${local.external_dns.service_account}"]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${replace(data.aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")}:aud"
+      variable = "${replace(data.terraform_remote_state.eks.outputs.cluster_oidc_issuer_url, "https://", "")}:aud"
       values   = ["sts.amazonaws.com"]
     }
   }
 }
 
 resource "aws_iam_role" "external_dns" {
-  name               = "${local.cluster_name}-external-dns"
+  name               = "${var.cluster_name}-external-dns"
   assume_role_policy = data.aws_iam_policy_document.external_dns_assume_role.json
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.cluster_name}-external-dns"
+      Name = "${var.cluster_name}-external-dns"
     }
   )
 }
@@ -44,7 +44,8 @@ data "aws_iam_policy_document" "external_dns" {
   statement {
     effect = "Allow"
     actions = [
-      "route53:ChangeResourceRecordSets"
+      "route53:ChangeResourceRecordSets",
+      "route53:ListResourceRecordSets"
     ]
     resources = [
       "arn:aws:route53:::hostedzone/${data.aws_route53_zone.main.zone_id}"
@@ -54,22 +55,21 @@ data "aws_iam_policy_document" "external_dns" {
   statement {
     effect = "Allow"
     actions = [
-      "route53:ListHostedZones",
-      "route53:ListResourceRecordSets"
+      "route53:ListHostedZones"
     ]
     resources = ["*"]
   }
 }
 
 resource "aws_iam_policy" "external_dns" {
-  name        = "${local.cluster_name}-external-dns"
+  name        = "${var.cluster_name}-external-dns"
   description = "IAM policy for External-DNS to manage Route53 records"
   policy      = data.aws_iam_policy_document.external_dns.json
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.cluster_name}-external-dns"
+      Name = "${var.cluster_name}-external-dns"
     }
   )
 }
@@ -100,9 +100,9 @@ resource "helm_release" "external_dns" {
 
       # AWS-specific configuration
       aws = {
-        region          = data.aws_region.current.name
-        zoneType        = "public"
-        assumeRoleArn   = "" # Using IRSA instead
+        region         = data.aws_region.current.name
+        zoneType       = "public"
+        assumeRoleArn  = ""  # Using IRSA instead
         batchChangeSize = 1000
       }
 
@@ -119,10 +119,10 @@ resource "helm_release" "external_dns" {
       zoneIdFilters = [data.aws_route53_zone.main.zone_id]
 
       # Policy
-      policy = local.external_dns.policy # upsert-only
+      policy = local.external_dns.policy  # upsert-only
 
       # Registry configuration
-      registry   = "txt"
+      registry = "txt"
       txtOwnerId = local.external_dns.txt_owner_id
       txtPrefix  = "external-dns-"
 

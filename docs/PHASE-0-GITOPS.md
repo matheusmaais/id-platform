@@ -12,14 +12,14 @@ graph TB
     ALB -->|TLS Terminated| ArgoCD[ArgoCD Server]
     ArgoCD -->|OIDC Auth| Cognito[Cognito User Pool]
     Cognito -->|Groups Claim| ArgoCD
-    
+
     LBC[AWS LB Controller] -->|Provisions| ALB
     LBC -->|IRSA| IAM_LBC[IAM Role LBC]
-    
+
     ExternalDNS[External-DNS] -->|Creates Records| Route53
     ExternalDNS -->|Watches| Ingress[Ingress Resources]
     ExternalDNS -->|IRSA| IAM_DNS[IAM Role DNS]
-    
+
     ArgoCD -->|Syncs| GitRepo[GitHub: id-platform]
     GitRepo -->|Apps| Platform[Platform Apps]
 ```
@@ -35,7 +35,7 @@ graph TB
   - MFA optional
   - Advanced security mode
   - Groups claim in ID token (`cognito:groups`)
-  
+
 **Admin Group:**
 - Name: `argocd-admins`
 - Maps to ArgoCD `role:admin`

@@ -1,366 +1,243 @@
-# IDP Platform - AWS Infrastructure#
+# IDP Platform — Internal Developer Platform on AWS
 
-> **Status:** Phase 2 Complete - App Scaffolding & Deploy ✅
-> **Last Updated:** 2026-01-29
+Production-grade Internal Developer Platform running on EKS. Developers get self-service infrastructure provisioning via Backstage + Crossplane, GitOps-driven deployments via ArgoCD, and a golden path for creating containerized microservices — all behind Cognito SSO.
 
-Internal Developer Platform (IDP) para self-service de infraestrutura e aplicações na AWS.
+**Region:** `us-east-1` · **Domain:** `timedevops.click` · **Cluster:** `platform-eks`
 
-## 🎯 O Que É Esta Plataforma
+---
 
-Uma plataforma completa que permite desenvolvedores:
+## Architecture
 
-- ✅ **Provisionar infraestrutura AWS** via interface gráfica (RDS, S3, EC2)
-- ✅ **Fazer deploy de aplicações** containerizadas com um clique
-- ✅ **Observabilidade integrada** (logs, métricas, dashboards)
-- ✅ **Autenticação unificada** via Cognito SSO (ArgoCD, Backstage)
-- ✅ **GitOps nativo** com ArgoCD (auto-sync, auto-healing)
-- ✅ **Auto-scaling inteligente** com Karpenter (Spot instances, 70% economia)
+```mermaid
+graph TB
+    subgraph Developer
+        DEV[Developer]
+    end
 
-**Time to first deploy:** De 2 semanas (manual) para 5 minutos (IDP) → **99% redução**
+    subgraph "Developer Portal"
+        BS[Backstage<br/>backstage.timedevops.click]
+    end
 
-## 🏗️ Arquitetura de Alto Nível
+    subgraph "Authentication"
+        COG[Amazon Cognito<br/>OIDC / SSO]
+    end
+
+    subgraph "EKS Cluster — platform-eks"
+        subgraph "GitOps"
+            ARGO[ArgoCD v3.2.6]
+        end
+        subgraph "Autoscaling"
+            KARP[Karpenter 1.8.6<br/>Spot-first]
+        end
+        subgraph "Networking"
+            ALBC[AWS LB Controller v2.17.1]
+            EDNS[External-DNS 0.20.0]
+        end
+        subgraph "Infrastructure Self-Service"
+            CP[Crossplane<br/>AWS Providers v2.3.0]
+        end
+        subgraph "Secrets & Observability"
+            ESO[External-Secrets v0.11.0]
+            PROM[Prometheus Stack]
+            KC[Kubecost]
+        end
+        subgraph "Workloads"
+            APPS[Application Pods]
+        end
+    end
+
+    subgraph "AWS Resources (provisioned by Crossplane)"
+        RDS[(Aurora / RDS)]
+        S3[S3 + CloudFront]
+        APIGW[API Gateway]
+        R53[Route 53]
+        ECR[ECR]
+    end
+
+    DEV --> BS
+    DEV --> COG
+    BS --> ARGO
+    COG -.->|OIDC| ARGO
+    COG -.->|OIDC| BS
+    ARGO --> APPS
+    CP --> RDS
+    CP --> S3
+    CP --> APIGW
+    ALBC --> R53
+    EDNS --> R53
+    APPS --> RDS
+    APPS --> S3
+```
+
+---
+
+## Platform Components
+
+| Component | Version | Purpose |
+|-----------|---------|---------|
+| EKS | 1.31 | Kubernetes control plane |
+| Karpenter | 1.8.6 | Spot-first node autoscaling |
+| ArgoCD | v3.2.6 | GitOps continuous delivery |
+| AWS LB Controller | v2.17.1 | ALB/NLB ingress provisioning |
+| External-DNS | 0.20.0 | Route 53 DNS automation |
+| External-Secrets | v0.11.0 | Secrets management (AWS → K8s) |
+| Crossplane + AWS Providers | v2.3.0 | Infrastructure self-service |
+| Backstage | latest | Developer portal & templates |
+| Kubecost | latest | Cost management & visibility |
+| Prometheus Stack | latest | Monitoring & alerting |
+| Amazon Cognito | — | SSO / OIDC authentication |
+
+### Crossplane AWS Providers
+
+All at `v2.3.0`: `provider-family-aws`, `aws-rds`, `aws-s3`, `aws-cloudfront`, `aws-ec2`, `aws-route53`, `aws-apigatewayv2`, `aws-secretsmanager`.
+
+---
+
+## Self-Service Capabilities (Crossplane XRDs)
+
+Developers provision AWS infrastructure by creating claims — no Terraform or AWS console access needed.
+
+| XRD | API | What It Provisions |
+|-----|-----|--------------------|
+| Aurora Database | `xauroras.platform.darede.io` | Aurora PostgreSQL or MySQL cluster with subnets, security groups, and parameter groups |
+| Static Website | `xstaticwebsites.platform.darede.io` | S3 bucket + CloudFront distribution with OAC and custom domain |
+| HTTP API | `xhttpapis.platform.darede.io` | API Gateway + Cognito authorizer + VPC Link to internal services |
+
+### Compositions
+
+| Composition | Description |
+|-------------|-------------|
+| `aurora-mysql` | Aurora MySQL cluster |
+| `aurora-postgresql` | Aurora PostgreSQL cluster |
+| `rds-mysql` | Standalone RDS MySQL instance |
+| `rds-postgresql` | Standalone RDS PostgreSQL instance |
+| `httpapi-cognito-vpclink` | HTTP API with Cognito auth and VPC Link |
+| `static-website` | S3 + CloudFront static site |
+
+---
+
+## Golden Path: 3-Tier Application
+
+When a developer creates an application through Backstage:
 
 ```
-Internet → ALB Shared (TLS) → EKS Pods → RDS/S3/Secrets
-                ↓
-         Cognito SSO ← ArgoCD/Backstage
-                ↓
-         GitHub Repos ← Backstage Templates
-                ↓
-         ECR Registry ← GitHub Actions CI
+1. Backstage Template    → Scaffolds app repo (Node.js / Python / Go)
+2. GitHub Repository     → Created with CI/CD workflow, Dockerfile, catalog-info
+3. GitHub Actions CI/CD  → Builds image, pushes to ECR
+4. GitOps Repo Updated   → K8s manifests + ArgoCD Application written
+5. ArgoCD Sync           → Deploys pods, service, ingress to EKS
+6. Crossplane Claims     → Provisions RDS + S3 + CloudFront as needed
+7. External-DNS + LB     → Configures Route 53 DNS + ALB
+8. App Live              → Accessible at <app>.timedevops.click
 ```
 
-**Stack Completo:**
-- **Infra:** VPC, EKS 1.31, Karpenter v1.8.6, Shared ALB
-- **GitOps:** ArgoCD v3.2.6, AWS LB Controller, External-DNS
-- **IDP Portal:** Backstage (custom image) com Cognito OIDC
-- **Observability:** Prometheus, Loki, Grafana (roadmap)
-- **Autenticação:** AWS Cognito User Pool com Lambda pre-token generation
+Each app gets: structured logging, Prometheus metrics (`/metrics`), health probes (`/health`, `/ready`), ServiceMonitor, and Backstage catalog entry with observability deep links.
 
-## 🚀 Quick Start
+---
 
-### Para DevOps/SRE (Bootstrap da Plataforma)
+## Repository Structure
+
+```
+id-platform-workspace/
+├── terraform/
+│   ├── vpc/                  # VPC, subnets, NAT Gateway
+│   ├── eks/                  # EKS cluster, Karpenter IAM
+│   ├── addons/               # Karpenter controller + NodePool
+│   └── platform-gitops/      # ArgoCD, Cognito, LB Controller, External-DNS
+├── argocd-apps/
+│   └── platform/             # ArgoCD Application manifests
+├── docs/                     # Architecture decisions, guides, reports
+├── Makefile                  # Automation targets
+└── README.md
+```
+
+---
+
+## Terraform Stacks
+
+All stacks use S3 backend with bucket `poc-idp-tfstate` and AWS profile `darede`.
+
+| Stack | Purpose | State Key |
+|-------|---------|-----------|
+| `vpc` | VPC, subnets, NAT Gateway | `vpc/terraform.tfstate` |
+| `eks` | EKS cluster, bootstrap nodes, Karpenter IAM | `eks/terraform.tfstate` |
+| `addons` | Karpenter controller, NodePool, EC2NodeClass | `addons/terraform.tfstate` |
+| `platform-gitops` | ArgoCD, Cognito, AWS LB Controller, External-DNS | `platform-gitops/terraform.tfstate` |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- AWS CLI configured with profile `darede`
+- Terraform ≥ 1.5
+- kubectl
+- make
+
+### Install
 
 ```bash
-# 1. Clone e configure
-git clone https://github.com/darede-labs/idp-platform.git
-cd idp-platform
-
-# 2. Configure AWS CLI
-export AWS_PROFILE=darede
-aws sso login --profile darede
-
-# 3. Edite configurações
-vim config/platform-params.yaml  # Domínios, GitHub org, etc
-vim .env  # Secrets (GITHUB_TOKEN, COGNITO_ADMIN_TEMP_PASSWORD)
-
-# 4. Bootstrap completo (30-40 min)
 make install
-
-# 5. Validação
-make validate
-make validate-gitops
 ```
 
-### Para Desenvolvedores (Criar Nova Aplicação)
+Runs in order: `apply-vpc` → `apply-eks` → `apply-addons` → `apply-gitops` → `configure-kubectl` → `validate`
 
-1. **Acesse Backstage:** https://backstage.timedevops.click
-2. **Login:** Use seu email corporativo (Cognito SSO)
-3. **Create Component:** Clique em "Create" → "Node.js App"
-4. **Preencha o formulário:**
-   - App name: `myapp` (lowercase, sem espaços)
-   - Architecture: `arm64` (recomendado para Graviton)
-   - Expose publicly: `Yes` (se precisa de ingress público)
-5. **Aguarde ~5 minutos**
-6. **Acesse:** https://myapp.timedevops.click
-
-**O que foi criado automaticamente:**
-- ✅ Repositório GitHub `idp-myapp` com código Node.js + Express
-- ✅ CI/CD via GitHub Actions (build → ECR → deploy)
-- ✅ Namespace Kubernetes `myapp`
-- ✅ Deployment + Service + Ingress
-- ✅ DNS automático via External-DNS
-- ✅ Observabilidade (logs no Loki, métricas no Prometheus)
-
-Ver [docs/GOLDEN-PATH-GUIDE.md](docs/GOLDEN-PATH-GUIDE.md) para detalhes.
-
-## 📋 Quick Start (Resumo)
-
-## 📁 Estrutura do Repositório
-
-```
-id-platform/
-├── terraform/                      # Infraestrutura (Terraform)
-│   ├── vpc/                       # VPC, subnets, NAT Gateway
-│   ├── eks/                       # EKS cluster, bootstrap nodes, Karpenter IAM
-│   ├── addons/                    # Karpenter deployment
-│   └── platform-gitops/           # ArgoCD, Cognito, LB Controller, External-DNS
-├── argocd-apps/                   # ArgoCD Applications (GitOps)
-│   └── platform/
-│       └── backstage-appset.yaml  # Backstage ApplicationSet
-├── platform-apps/                 # Configuração de aplicações
-│   └── backstage/
-│       └── values.yaml            # Backstage Helm values
-├── backstage-custom/              # Backstage custom image source
-│   └── templates/
-│       └── idp-nodejs-app/        # Template Node.js
-├── config/
-│   └── platform-params.yaml       # Single source of truth (config não-sensível)
-├── docs/                          # Documentação
-│   ├── STATE.md                   # Estado canônico da plataforma
-│   ├── PLATFORM-PRESENTATION.md   # Apresentação técnica completa
-│   ├── ARCHITECTURE-DECISIONS.md  # ADRs
-│   └── GOLDEN-PATH-GUIDE.md       # Guia para desenvolvedores
-├── Makefile                       # Automação (make install, make destroy, etc)
-└── README.md                      # Este arquivo
-```
-
-## 🧱 Terraform Stacks (Bootstrap Layer)
-
-4 stacks independentes com estado isolado em S3 (`s3://poc-idp-tfstate/`):
-
-| Stack | Propósito | Tempo | Estado |
-|-------|-----------|-------|--------|
-| `vpc` | VPC, 3 AZs, subnets, NAT Gateway, IGW | 5-7 min | `vpc/terraform.tfstate` |
-| `eks` | EKS 1.31, bootstrap nodes (t4g.medium ARM64), Shared ALB SG | 10-15 min | `eks/terraform.tfstate` |
-| `addons` | Karpenter v1.8.6, EC2NodeClass, NodePool (Spot) | 3-5 min | `addons/terraform.tfstate` |
-| `platform-gitops` | ArgoCD, Cognito, LB Controller, External-DNS | 5-7 min | `platform-gitops/terraform.tfstate` |
-
-**Princípio:** Depois do bootstrap (`make install`), todas as mudanças vão via **GitOps** (ArgoCD), não mais Terraform.
-
-## 🔧 Instalação Completa
-
-### Pré-requisitos
-
-- AWS CLI configurado com perfil SSO
-- Terraform >= 1.5
-- kubectl >= 1.28
-- Acesso ao repositório GitHub (para templates)
-- Domínio configurado no Route53
-
-### Bootstrap (Terraform)
-
-```bash
-# Instalação completa (VPC → EKS → Addons → GitOps)
-make install  # ~30-40 min total
-```
-
-**Executa em ordem:**
-1. `make apply-vpc` → VPC, subnets, NAT Gateway
-2. `make apply-eks` → EKS cluster, bootstrap nodes, IAM
-3. `make apply-addons` → Karpenter
-4. `make apply-gitops` → ArgoCD, Cognito, LB Controller, External-DNS
-
-### Platform Apps (GitOps)
-
-```bash
-# Backstage (IDP portal)
-make install-backstage
-
-# Observability (futuro)
-make install-observability
-```
-
-Depois disso, todas as mudanças são via Git commits → ArgoCD auto-sync.
-
-## Destruction
-
-Full platform destruction:
+### Destroy
 
 ```bash
 make destroy
 ```
 
-This runs in reverse order:
-1. `make destroy-gitops`
-2. `make destroy-addons`
-3. `make destroy-eks`
-4. `make destroy-vpc`
+Runs in reverse: `destroy-gitops` → `destroy-addons` → `destroy-eks` → `destroy-vpc`
 
-## ✅ Validação e Health Checks
+### Other Commands
 
 ```bash
-# Cluster health geral
-make validate
-# ✅ EKS cluster ACTIVE
-# ✅ Nodes ready
-# ✅ CoreDNS running
-
-# GitOps components
-make validate-gitops
-# ✅ ArgoCD healthy
-# ✅ Applications synced
-# ✅ AWS LB Controller running
-# ✅ External-DNS running
-# ✅ ALB targets healthy
-
-# App platform (Phase 2)
-make validate-app-platform
-# ✅ AppProject "apps" exists
-# ✅ ApplicationSet "workloads" running
-# ✅ Backstage accessible
+make plan-all           # Plan all Terraform stacks
+make validate           # Check cluster health (nodes, pods, Karpenter)
+make validate-gitops    # Check ArgoCD, External-DNS, LB Controller, DNS
+make configure-kubectl  # Update kubeconfig for platform-eks
+make test-karpenter     # Test Spot node provisioning
 ```
-
-## 🌐 Acessos
-
-| Serviço | URL | Autenticação |
-|---------|-----|--------------|
-| **ArgoCD** | https://argocd.timedevops.click | Cognito SSO |
-| **Backstage** | https://backstage.timedevops.click | Cognito SSO |
-| **Aplicações** | https://<app-name>.timedevops.click | Depende da app |
-
-**Credenciais:** Configuradas via Cognito User Pool (`admin@timedevops.click`)
-
-## 🔧 Troubleshooting Rápido
-
-### ArgoCD/Backstage retorna 504
-
-```bash
-# Verificar ALB target health
-kubectl get ingress -n argocd
-aws elbv2 describe-target-health --target-group-arn <arn>
-
-# Verificar pods
-kubectl get pods -n argocd
-kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
-```
-
-### DNS não resolve
-
-```bash
-# Verificar External-DNS
-kubectl logs -n kube-system -l app.kubernetes.io/name=external-dns
-
-# Verificar Route53
-dig <domain> +short
-```
-
-### Karpenter não provisiona nodes
-
-```bash
-# Verificar NodePool
-kubectl get nodepool
-kubectl describe nodepool karpenter-node-group
-
-# Logs
-kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter
-```
-
-Ver [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) para guia completo.
-
-## 📚 Documentação
-
-### Para DevOps/SRE
-
-- **[docs/PLATFORM-PRESENTATION.md](docs/PLATFORM-PRESENTATION.md)** - Apresentação técnica completa (START HERE)
-- **[docs/STATE.md](docs/STATE.md)** - Estado canônico, histórico de mudanças
-- **[docs/ARCHITECTURE-DECISIONS.md](docs/ARCHITECTURE-DECISIONS.md)** - ADRs (decisões de arquitetura)
-- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Guia de troubleshooting
-
-### Para Desenvolvedores
-
-- **[docs/GOLDEN-PATH-GUIDE.md](docs/GOLDEN-PATH-GUIDE.md)** - Como criar apps via Backstage
-- **[docs/APP-ONBOARDING-FLOW.md](docs/APP-ONBOARDING-FLOW.md)** - Fluxo detalhado de onboarding
-- **[docs/end-to-end-flow.md](docs/end-to-end-flow.md)** - Fluxo completo: do request à produção (com diagramas)
-
-## 🗺️ Fases de Desenvolvimento
-
-### ✅ Phase 0 - Bootstrap (COMPLETE)
-
-**Objetivo:** Plataforma base determinística, rebuild from scratch sem steps manuais.
-
-**Incluído:**
-- ✅ VPC multi-AZ com NAT Gateway
-- ✅ EKS 1.31 com Karpenter (Spot instances, ARM64)
-- ✅ ArgoCD com Cognito SSO (GitOps engine)
-- ✅ Shared ALB + External-DNS (DNS automático)
-- ✅ Backstage (IDP portal) com OIDC
-
-**Validação:** `make destroy && make install` deve funcionar sem intervenção manual.
-
-### ✅ Phase 2 - App Scaffolding & Deploy (COMPLETE)
-
-**Objetivo:** Desenvolvedores criam apps com 1 clique via Backstage.
-
-**Incluído:**
-- ✅ Backstage templates (Node.js + Express com observabilidade)
-- ✅ GitHub Actions CI/CD (build → ECR → GitOps update)
-- ✅ ArgoCD ApplicationSet (auto-discovery de repos `idp-*`)
-- ✅ Workload namespaces (1 namespace por app)
-- ✅ Shared ALB + DNS automático
-- ✅ Multi-arch support (arm64/amd64/multi)
-
-**Status:** Apps podem ser criados em ~5 minutos via Backstage UI.
-
-### 🚧 Phase 1 - Infra Self-Service (NEXT)
-
-**Objetivo:** Provisionar RDS, S3, EC2 via Backstage (Crossplane).
-
-**Planejado:**
-- [ ] Crossplane AWS Provider
-- [ ] CompositeResourceDefinitions (RDS, S3, EC2)
-- [ ] T-shirt sizing (S/M/L para recursos)
-- [ ] Templates Backstage para infra
-- [ ] RBAC (users só deletam seus recursos)
-
-### 📋 Phase 3 - Hardening (LATER)
-
-**Planejado:**
-- [ ] Observability stack (Prometheus, Loki, Grafana via GitOps)
-- [ ] Kyverno policies (PodSecurityStandards)
-- [ ] Cost governance (budget alerts)
-- [ ] Production HA (multi-AZ para componentes críticos)
-- [ ] Disaster recovery automation
-
-## 🛠️ Stack Tecnológico
-
-### Infraestrutura
-- **Cloud:** AWS (VPC, EKS, Route53, Cognito, ECR)
-- **IaC:** Terraform 1.5+
-- **Container Runtime:** containerd
-- **Networking:** AWS VPC CNI, ALB, NAT Gateway
-
-### Kubernetes Ecosystem
-- **Distribution:** Amazon EKS 1.31
-- **Autoscaling:** Karpenter v1.8.6 (Spot instances)
-- **Ingress:** AWS Load Balancer Controller v2.17.1
-- **DNS:** External-DNS v0.20.0
-- **GitOps:** ArgoCD v3.2.6
-
-### Developer Platform
-- **Portal:** Backstage (custom image, v1.47.1)
-- **Templates:** Software Templates (Node.js, futuro: Python, Go)
-- **Auth:** AWS Cognito (OIDC)
-- **CI/CD:** GitHub Actions
-
-### Observability (Roadmap)
-- **Logs:** Promtail + Loki
-- **Metrics:** Prometheus + Grafana
-- **Traces:** OpenTelemetry (futuro)
-
-## 🤝 Suporte
-
-- **Documentação:** [docs/](docs/)
-- **Troubleshooting:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- **Estado Atual:** [docs/STATE.md](docs/STATE.md)
-- **GitHub Issues:** Para bugs e feature requests
-- **Slack:** `#platform-team` (interno)
-
-## 📊 Métricas
-
-| Métrica | Antes | Depois | Melhoria |
-|---------|-------|--------|----------|
-| Time to provision infra | 2-3 semanas | 5-10 min | 99% ↓ |
-| Time to first deploy | 2 dias | 5 min | 99.8% ↓ |
-| Deploy frequency | 1x/semana | 10x/dia | 10x ↑ |
-| Compute cost | $5000/mês | $1500/mês | 70% ↓ |
-
-## 📝 Licença
-
-Proprietary - DareDe Labs
 
 ---
 
-**Última Atualização:** 2026-01-29
-**Versão da Plataforma:** Phase 2 Complete
-**Maintainers:** Platform Team
+## Access URLs
+
+| Service | URL |
+|---------|-----|
+| ArgoCD | https://argocd.timedevops.click |
+| Backstage | https://backstage.timedevops.click |
+| Kubecost | https://kubecost.timedevops.click |
+
+---
+
+## Authentication
+
+All platform UIs use **Amazon Cognito** as the OIDC identity provider.
+
+- **SSO:** Single sign-on across ArgoCD, Backstage, and Kubecost
+- **Admin group:** `argocd-admins` (full ArgoCD access)
+- **Protocol:** OIDC with Cognito User Pool
+
+---
+
+## Phases
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| Phase 0 — Bootstrap | VPC, EKS, Karpenter, ArgoCD, Cognito SSO, Backstage, External-Secrets | ✅ Complete |
+| Phase 1 — Infra Self-Service | Crossplane AWS providers, XRDs, Compositions, self-service via Backstage | ✅ Complete |
+| Phase 2 — App Scaffolding | Golden Path templates (Node.js, Python, Go), CI/CD, GitOps, observability | ✅ Complete |
+
+---
+
+## Documentation
+
+See `docs/` for detailed guides:
+
+- [STATE.md](docs/STATE.md) — Canonical platform state and decisions
+- [GOLDEN-PATH-GUIDE.md](docs/GOLDEN-PATH-GUIDE.md) — How to use the Create Application template
+- [CROSSPLANE-SUCCESS.md](docs/CROSSPLANE-SUCCESS.md) — Crossplane setup and validation
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — Common issues and fixes

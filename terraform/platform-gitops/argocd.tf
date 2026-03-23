@@ -1,6 +1,5 @@
 ################################################################################
 # ArgoCD Helm Release with Cognito OIDC
-# Uses shared ALB via IngressGroup (see ADR-001)
 ################################################################################
 
 resource "helm_release" "argocd" {
@@ -40,12 +39,6 @@ resource "helm_release" "argocd" {
                   scopes = ["openid", "profile", "email"]
 
                   # Claim mappings
-                  # Cognito doesn't return "name" claim, so we use email as username
-                  userNameKey = "email"
-
-                  # Don't require email_verified claim (Cognito may not always return it)
-                  insecureSkipEmailVerified = true
-
                   claimMapping = {
                     groups = "cognito:groups"
                   }
@@ -67,14 +60,9 @@ resource "helm_release" "argocd" {
         # RBAC Configuration
         rbac = {
           # RBAC policy
-          # Note: Cognito returns groups as JSON array string via Lambda trigger
-          # The claim is mapped to "cognito:groups" -> "groups" in Dex
           "policy.csv" = <<-EOT
-            # ArgoCD Admins group gets admin role (Cognito group name)
+            # ArgoCD Admins group gets admin role
             g, ${local.cognito.admin_group_name}, role:admin
-
-            # Fallback: Admin email gets admin role (in case group mapping fails)
-            g, ${local.cognito_admin_email}, role:admin
 
             # Additional custom policies can be added here
           EOT
@@ -82,20 +70,19 @@ resource "helm_release" "argocd" {
           # Default policy for authenticated users
           "policy.default" = "role:readonly"
 
-          # Scopes for RBAC - must include groups
+          # Scopes for RBAC
           scopes = "[groups, email]"
         }
 
         # Parameters
         params = {
           # Server configuration
-          "server.insecure"                                   = "true" # TLS terminated at ALB
-          "server.basehref"                                   = "/"
-          "server.rootpath"                                   = ""
-          "server.disable.auth"                               = "false"
-          "server.enable.gzip"                                = "true"
-          "server.x.frame.options"                            = "sameorigin"
-          "application.namespaces"                            = local.argocd.namespace
+          "server.insecure"                    = "true" # TLS terminated at ALB
+          "server.rootpath"                    = "/"
+          "server.disable.auth"                = "false"
+          "server.enable.gzip"                 = "true"
+          "server.x.frame.options"             = "sameorigin"
+          "application.namespaces"             = local.argocd.namespace
           "applicationsetcontroller.enable.progressive.syncs" = "true"
         }
       }
@@ -119,23 +106,19 @@ resource "helm_release" "argocd" {
 
         # Autoscaling
         autoscaling = {
-          enabled                           = true
-          minReplicas                       = 2
-          maxReplicas                       = 5
+          enabled     = true
+          minReplicas = 2
+          maxReplicas = 5
           targetCPUUtilizationPercentage    = 80
           targetMemoryUtilizationPercentage = 80
         }
 
-        # Ingress configuration - Uses shared ALB via IngressGroup
+        # Ingress configuration
         ingress = {
           enabled = true
           annotations = {
-            # ALB IngressGroup - shares ALB with other platform apps
-            "kubernetes.io/ingress.class"           = "alb"
-            "alb.ingress.kubernetes.io/group.name"  = local.shared_alb.group_name
-            "alb.ingress.kubernetes.io/group.order" = "10"
-
             # ALB configuration
+            "kubernetes.io/ingress.class"                    = "alb"
             "alb.ingress.kubernetes.io/scheme"               = "internet-facing"
             "alb.ingress.kubernetes.io/target-type"          = "ip"
             "alb.ingress.kubernetes.io/backend-protocol"     = "HTTP"
@@ -149,8 +132,8 @@ resource "helm_release" "argocd" {
             # External DNS
             "external-dns.alpha.kubernetes.io/hostname" = local.subdomains.argocd
 
-            # Security - uses shared platform ALB security group from EKS module
-            "alb.ingress.kubernetes.io/security-groups" = local.shared_alb.security_group_id
+            # Security
+            "alb.ingress.kubernetes.io/security-groups" = data.terraform_remote_state.eks.outputs.cluster_security_group_id
           }
 
           hosts = [local.subdomains.argocd]
@@ -206,9 +189,9 @@ resource "helm_release" "argocd" {
         replicas = 2
 
         autoscaling = {
-          enabled                           = true
-          minReplicas                       = 2
-          maxReplicas                       = 5
+          enabled     = true
+          minReplicas = 2
+          maxReplicas = 5
           targetCPUUtilizationPercentage    = 80
           targetMemoryUtilizationPercentage = 80
         }
@@ -237,11 +220,6 @@ resource "helm_release" "argocd" {
       # Dex (OIDC proxy)
       dex = {
         enabled = true
-        # Rollout protection: forces Dex pods restart when Cognito hosted UI domain changes.
-        # Cognito OIDC discovery uses the User Pool Domain for authorization/token endpoints.
-        podAnnotations = {
-          "idp.darede.io/cognito-domain" = local.cognito.oauth_domain_prefix
-        }
         resources = {
           requests = {
             cpu    = "10m"
